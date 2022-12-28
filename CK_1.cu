@@ -198,8 +198,9 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 		for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
 		{
 			//uint8_t outPixel = 0;
-			uint8_t outPixel_x = 0;
-			uint8_t outPixel_y = 0;
+			//uint8_t outPixel_x = 0; /////lúc đầu
+			int outPixel_x = 0;       /////mới chỉnh
+			int outPixel_y = 0;
 			for (int filterR = 0; filterR < filterWidth; filterR++)
 			{
 				for (int filterC = 0; filterC < filterWidth; filterC++)
@@ -283,6 +284,14 @@ int main(int argc, char ** argv)
 	x_Sobel[2] = x_Sobel[8] = y_Sobel[6] = y_Sobel[8] = -1;
 	x_Sobel[3] = y_Sobel[1] = 2;
 	x_Sobel[5] = y_Sobel[7] = -2;
+
+	// for (int i=0;i<9;i++){
+	// 	printf("%i, ", x_Sobel[i]);
+	// }
+
+	// for (int i=0;i<9;i++){
+	// 	printf("%i, ", y_Sobel[i]);
+	// }
 	
 	// Convert RGB to grayscale not using device
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
