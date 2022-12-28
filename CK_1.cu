@@ -310,5 +310,5 @@ int main(int argc, char ** argv)
 	free(x_Sobel);
 	free(y_Sobel);
 	free(correctOutPixels);
-	free(outPixels);
+	//free(outPixels);
 }
