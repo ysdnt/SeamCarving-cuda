@@ -118,22 +118,11 @@ void writePnm(uint8_t * pixels, int width, int height,
 	fclose(f);
 }
 
-// __global__ void convertRgb2GrayKernel(uint8_t * inPixels, int width, int height, 
-// 		uint8_t * outPixels)
-// {
-// 	// TODO
-//     // Reminder: gray = 0.299*red + 0.587*green + 0.114*blue  
-
-// }
-
 void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 		uint8_t * outPixels)
 {
 	GpuTimer timer;
-	timer.Start();
-	// if (useDevice == false)
-	// {
-          
+	timer.Start();    
 	for (int r = 0; r < height; r++)
 	{
 		for (int c = 0; c < width; c++)
@@ -145,29 +134,8 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 			outPixels[i] = 0.299f * red + 0.587f * green + 0.114f * blue;
 		}
 	}
-	//}
-	// else // use device
-	// {
-	// 	cudaDeviceProp devProp;
-	// 	cudaGetDeviceProperties(&devProp, 0);
-	// 	printf("GPU name: %s\n", devProp.name);
-	// 	printf("GPU compute capability: %d.%d\n", devProp.major, devProp.minor);
-
-	// 	// TODO: Allocate device memories
-
-	// 	// TODO: Copy data to device memories
-
-	// 	// TODO: Set grid size and call kernel (remember to check kernel error)
-
-	// 	// TODO: Copy result from device memories
-
-	// 	// TODO: Free device memories
-
-	// }
 	timer.Stop();
 	float time = timer.Elapsed();
-	// printf("Processing time (%s): %f ms\n\n", 
-	// 		useDevice == true? "use device" : "use host", time);
 	printf("Processing time: %f ms\n\n", time);
 }
 
@@ -177,29 +145,11 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 {
 	GpuTimer timer;
 	timer.Start();
-	// if (useDevice == false)
-	// {
-          
-	// for (int r = 0; r < height; r++)
-	// {
-	// 	for (int c = 0; c < width; c++)
-	// 	{
-	// 		for (int f_r = 0; f_r < filterWidth; f_r++)
-	// 		{
-	// 			for (int f_c = 0; f_c < filterWidth; f_c++)
-	// 			{
-					
-	// 			}
-	// 		}
-	// 	}
-	// }
 	for (int outPixelsR = 0; outPixelsR < height; outPixelsR++)
 	{
 		for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
 		{
-			//uint8_t outPixel = 0;
-			//uint8_t outPixel_x = 0; /////lúc đầu
-			int outPixel_x = 0;       /////mới chỉnh
+			int outPixel_x = 0;       
 			int outPixel_y = 0;
 			for (int filterR = 0; filterR < filterWidth; filterR++)
 			{
@@ -219,29 +169,8 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 			outPixels[outPixelsR * width + outPixelsC] = abs(outPixel_x) + abs(outPixel_y);
 		}
 	}
-	//}
-	// else // use device
-	// {
-	// 	cudaDeviceProp devProp;
-	// 	cudaGetDeviceProperties(&devProp, 0);
-	// 	printf("GPU name: %s\n", devProp.name);
-	// 	printf("GPU compute capability: %d.%d\n", devProp.major, devProp.minor);
-
-	// 	// TODO: Allocate device memories
-
-	// 	// TODO: Copy data to device memories
-
-	// 	// TODO: Set grid size and call kernel (remember to check kernel error)
-
-	// 	// TODO: Copy result from device memories
-
-	// 	// TODO: Free device memories
-
-	// }
 	timer.Stop();
 	float time = timer.Elapsed();
-	// printf("Processing time (%s): %f ms\n\n", 
-	// 		useDevice == true? "use device" : "use host", time);
 	printf("Processing time: %f ms\n\n", time);
 }
 
@@ -300,7 +229,7 @@ int main(int argc, char ** argv)
 	// Convert grayscale to sobel-grayscale not using device
 	uint8_t * correctOutSobelPixels= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
-
+	
 	// Convert RGB to grayscale using device
 	// uint8_t * outPixels= (uint8_t *)malloc(width * height);
 	// dim3 blockSize(32, 32); // Default
@@ -319,6 +248,7 @@ int main(int argc, char ** argv)
 	char * outFileNameBase = strtok(argv[2], "."); // Get rid of extension
 	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
 	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
+	
 	//writePnm(outPixels, 1, width, height, concatStr(outFileNameBase, "_device.pnm"));
 
 	// Free memories
