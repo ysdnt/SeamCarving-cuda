@@ -191,30 +191,30 @@ void convertRgb2GraySobel(uchar3 * inPixels, int width, int height,
 		// 		outPixels[i] = 0.299f*red + 0.587f*green + 0.114f*blue;
 		// 	}
 		// }
-	for (int outPixelsR = 0; outPixelsR < height; outPixelsR++)
-	{
-		for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
-		{
-			uint8_t outPixel = 0;
-			for (int filterR = 0; filterR < filterWidth; filterR++)
-			{
-				for (int filterC = 0; filterC < filterWidth; filterC++)
-				{
-					int8_t filterVal_x = x_Sobel[filterR * filterWidth + filterC];
-					int8_t filterVal_y = y_Sobel[filterR * filterWidth + filterC];
-					int inPixelsR = outPixelsR - filterWidth/2 + filterR;
-					int inPixelsC = outPixelsC - filterWidth/2 + filterC;
-					inPixelsR = min(max(0, inPixelsR), height - 1);
-					inPixelsC = min(max(0, inPixelsC), width - 1);
-					uchar3 inPixel = inPixels[inPixelsR * width + inPixelsC];
-					outPixel.x += filterVal * inPixel.x;
-					outPixel.y += filterVal * inPixel.y;
-					outPixel.z += filterVal * inPixel.z;
-				}
-			}
-			outPixels[outPixelsR*width + outPixelsC] = make_uchar3(outPixel.x, outPixel.y, outPixel.z); 
-		}
-	}
+	// for (int outPixelsR = 0; outPixelsR < height; outPixelsR++)
+	// {
+	// 	for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
+	// 	{
+	// 		uint8_t outPixel = 0;
+	// 		for (int filterR = 0; filterR < filterWidth; filterR++)
+	// 		{
+	// 			for (int filterC = 0; filterC < filterWidth; filterC++)
+	// 			{
+	// 				int8_t filterVal_x = x_Sobel[filterR * filterWidth + filterC];
+	// 				int8_t filterVal_y = y_Sobel[filterR * filterWidth + filterC];
+	// 				int inPixelsR = outPixelsR - filterWidth/2 + filterR;
+	// 				int inPixelsC = outPixelsC - filterWidth/2 + filterC;
+	// 				inPixelsR = min(max(0, inPixelsR), height - 1);
+	// 				inPixelsC = min(max(0, inPixelsC), width - 1);
+	// 				uchar3 inPixel = inPixels[inPixelsR * width + inPixelsC];
+	// 				outPixel.x += filterVal * inPixel.x;
+	// 				outPixel.y += filterVal * inPixel.y;
+	// 				outPixel.z += filterVal * inPixel.z;
+	// 			}
+	// 		}
+	// 		outPixels[outPixelsR*width + outPixelsC] = make_uchar3(outPixel.x, outPixel.y, outPixel.z); 
+	// 	}
+	// }
 	//}
 	// else // use device
 	// {
