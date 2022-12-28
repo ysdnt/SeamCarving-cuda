@@ -171,7 +171,7 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 	printf("Processing time: %f ms\n\n", time);
 }
 
-void convertRgb2GraySobel(uchar3 * inPixels, int width, int height,
+void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 		uint8_t * outPixels,
 		int8_t * x_Sobel, int8_t * y_Sobel, uint8_t filterWidth)
 {
@@ -180,41 +180,44 @@ void convertRgb2GraySobel(uchar3 * inPixels, int width, int height,
 	// if (useDevice == false)
 	// {
           
-		// for (int r = 0; r < height; r++)
-		// {
-		// 	for (int c = 0; c < width; c++)
-		// 	{
-		// 		int i = r * width + c;
-		// 		uint8_t red = inPixels[3 * i];
-		// 		uint8_t green = inPixels[3 * i + 1];
-		// 		uint8_t blue = inPixels[3 * i + 2];
-		// 		outPixels[i] = 0.299f*red + 0.587f*green + 0.114f*blue;
-		// 	}
-		// }
-	// for (int outPixelsR = 0; outPixelsR < height; outPixelsR++)
+	// for (int r = 0; r < height; r++)
 	// {
-	// 	for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
+	// 	for (int c = 0; c < width; c++)
 	// 	{
-	// 		uint8_t outPixel = 0;
-	// 		for (int filterR = 0; filterR < filterWidth; filterR++)
+	// 		for (int f_r = 0; f_r < filterWidth; f_r++)
 	// 		{
-	// 			for (int filterC = 0; filterC < filterWidth; filterC++)
+	// 			for (int f_c = 0; f_c < filterWidth; f_c++)
 	// 			{
-	// 				int8_t filterVal_x = x_Sobel[filterR * filterWidth + filterC];
-	// 				int8_t filterVal_y = y_Sobel[filterR * filterWidth + filterC];
-	// 				int inPixelsR = outPixelsR - filterWidth/2 + filterR;
-	// 				int inPixelsC = outPixelsC - filterWidth/2 + filterC;
-	// 				inPixelsR = min(max(0, inPixelsR), height - 1);
-	// 				inPixelsC = min(max(0, inPixelsC), width - 1);
-	// 				uchar3 inPixel = inPixels[inPixelsR * width + inPixelsC];
-	// 				outPixel.x += filterVal * inPixel.x;
-	// 				outPixel.y += filterVal * inPixel.y;
-	// 				outPixel.z += filterVal * inPixel.z;
+					
 	// 			}
 	// 		}
-	// 		outPixels[outPixelsR*width + outPixelsC] = make_uchar3(outPixel.x, outPixel.y, outPixel.z); 
 	// 	}
 	// }
+	for (int outPixelsR = 0; outPixelsR < height; outPixelsR++)
+	{
+		for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
+		{
+			//uint8_t outPixel = 0;
+			uint8_t outPixel_x = 0;
+			uint8_t outPixel_y = 0;
+			for (int filterR = 0; filterR < filterWidth; filterR++)
+			{
+				for (int filterC = 0; filterC < filterWidth; filterC++)
+				{
+					int8_t filterVal_x = x_Sobel[filterR * filterWidth + filterC];
+					int8_t filterVal_y = y_Sobel[filterR * filterWidth + filterC];
+					int inPixelsR = outPixelsR - filterWidth/2 + filterR;
+					int inPixelsC = outPixelsC - filterWidth/2 + filterC;
+					inPixelsR = min(max(0, inPixelsR), height - 1);
+					inPixelsC = min(max(0, inPixelsC), width - 1);
+					uint8_t inPixel = inPixels[inPixelsR * width + inPixelsC];
+					outPixel_x += filterVal_x * inPixel;
+					outPixel_y += filterVal_y * inPixel;
+				}
+			}
+			outPixels[outPixelsR * width + outPixelsC] = abs(outPixel_x) + abs(outPixel_y);
+		}
+	}
 	//}
 	// else // use device
 	// {
@@ -284,7 +287,10 @@ int main(int argc, char ** argv)
 	// Convert RGB to grayscale not using device
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
 	convertRgb2Gray(inPixels, width, height, correctOutPixels);
-	// convertRgb2GraySobel(inPixels, width, height, correctOutPixels, x_Sobel, y_Sobel, filterWidth);
+
+	// Convert grayscale to sobel-grayscale not using device
+	uint8_t * correctOutSobelPixels= (uint8_t *)malloc(width * height);
+	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
 
 	// Convert RGB to grayscale using device
 	// uint8_t * outPixels= (uint8_t *)malloc(width * height);
@@ -302,7 +308,8 @@ int main(int argc, char ** argv)
 
 	// Write results to files
 	char * outFileNameBase = strtok(argv[2], "."); // Get rid of extension
-	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_host.pnm"));
+	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
+	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
 	//writePnm(outPixels, 1, width, height, concatStr(outFileNameBase, "_device.pnm"));
 
 	// Free memories
@@ -310,5 +317,6 @@ int main(int argc, char ** argv)
 	free(x_Sobel);
 	free(y_Sobel);
 	free(correctOutPixels);
+	free(correctOutSobelPixels);
 	//free(outPixels);
 }
