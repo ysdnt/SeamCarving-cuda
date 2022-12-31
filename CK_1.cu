@@ -118,6 +118,23 @@ void writePnm(uint8_t * pixels, int width, int height,
 	fclose(f);
 }
 
+void writePnm(uchar3 * pixels, int width, int height, char * fileName)
+{
+	FILE * f = fopen(fileName, "w");
+	if (f == NULL)
+	{
+		printf("Cannot write %s\n", fileName);
+		exit(EXIT_FAILURE);
+	}	
+
+	fprintf(f, "P3\n%i\n%i\n255\n", width, height); 
+
+	for (int i = 0; i < width * height; i++)
+		fprintf(f, "%hhu\n%hhu\n%hhu\n", pixels[i].x, pixels[i].y, pixels[i].z);
+	
+	fclose(f);
+}
+
 void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 		uint8_t * outPixels)
 {
@@ -177,8 +194,8 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 void computeSumEnergy(uint8_t * inPixels, int width, int height,
 		int * outPixels, int8_t * trace)
 {
-	GpuTimer timer;
-	timer.Start();
+	// GpuTimer timer;
+	// timer.Start();
 
 	for (int c = 0; c < width; c++)
 	{
@@ -247,16 +264,16 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 		temp_sum = inPixel_cur + temp;
 		outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
 	}
-	timer.Stop();
-	float time = timer.Elapsed();
-	printf("Processing time (SumEnergy): %f ms\n\n", time);
+	// timer.Stop();
+	// float time = timer.Elapsed();
+	// printf("Processing time (SumEnergy): %f ms\n\n", time);
 }
 
 void findSeam(int * inPixels, int8_t * trace, int width, int height,
 		int * seam)
 {
-	GpuTimer timer;
-	timer.Start();
+	// GpuTimer timer;
+	// timer.Start();
 
 	int inPixel_idx = 0;
 	for (int c = 1; c < width; c++)
@@ -273,33 +290,29 @@ void findSeam(int * inPixels, int8_t * trace, int width, int height,
 		seam[i] = inPixel_idx;
 	}
 
-	timer.Stop();
-	float time = timer.Elapsed();
-	printf("Processing time (Seam): %f ms\n\n", time);
+	// timer.Stop();
+	// float time = timer.Elapsed();
+	// printf("Processing time (Seam): %f ms\n\n", time);
 }
 
 void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
-	GpuTimer timer;
-	timer.Start();
+	// GpuTimer timer;
+	// timer.Start();
 	int length = width * height;
 	for (int i = height - 1; i >= 0; i--)
 	{
-        printf("%i, ", length);
-		printf("%i, ", seam[i]);
-		printf("%i, ", (length - seam[i] - 1 - j));
-		// int src = 
-		// int dst = 
 		int j = 0;
-		memcpy(&inPixels_Sobel[seam[i]], &inPixels_Sobel[seam[i] + 1], length - seam[i] - 1);
+		memcpy(&inPixels_Sobel[seam[i]], &inPixels_Sobel[seam[i] + 1], length - seam[i] - 1 - j);
 		memcpy(&inPixels[seam[i]], &inPixels[seam[i] + 1], (length - seam[i] - 1 - j) * sizeof(uchar3));
 		j++;
 	}
-	//width--;
-	timer.Stop();
-	float time = timer.Elapsed();
-	printf("Processing time (removeSeam): %f ms\n\n", time);
+	// timer.Stop();
+	// float time = timer.Elapsed();
+	// printf("Processing time (removeSeam): %f ms\n\n", time);
 }
+
+
 
 // float computeError(uint8_t * a1, uint8_t * a2, int n)
 // {
@@ -325,11 +338,14 @@ int main(int argc, char ** argv)
 	// 	printf("The number of arguments is invalid\n");
 	// 	return EXIT_FAILURE;
 	// }
+
 	// Read input image file
 	int width, height;
 	uchar3 * inPixels;
 	readPnm(argv[1], width, height, inPixels);
 	printf("Image size (width x height): %i x %i\n\n", width, height);
+
+	char * outFileNameBase = strtok(argv[2], ".");
 
 	// Set up Sobel filters
 	uint8_t filterWidth = 3;
@@ -341,60 +357,43 @@ int main(int argc, char ** argv)
 	x_Sobel[3] = y_Sobel[1] = 2;
 	x_Sobel[5] = y_Sobel[7] = -2;
 
-	// for (int i=0;i<9;i++){
-	// 	printf("%i, ", x_Sobel[i]);
-	// }
-
-	// for (int i=0;i<9;i++){
-	// 	printf("%i, ", y_Sobel[i]);
-	// }
 	
 	// Convert RGB to grayscale not using device
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
 	convertRgb2Gray(inPixels, width, height, correctOutPixels);
+	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
 
 	// Convert grayscale to sobel-grayscale not using device
 	uint8_t * correctOutSobelPixels= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
-	
+	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
+
+	// New width
+	int new_width = 2 * width / 3;
+
 	int * correctSumEnergy = (int *)malloc(width * height * sizeof(int));
 	int8_t * trace = (int8_t *)malloc(width * height);
-	computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
-	// for (int i=0;i<width;i++){
-	// 	printf("%i, ", trace[i]);
-	// }
-
 	int * correctSeam = (int *)malloc(height * sizeof(int));
-	findSeam(correctSumEnergy, trace, width, height, correctSeam);
-	// for (int i=0;i<height;i++){
-	// 	printf("%i, ", correctSeam[i]);
-	// }
-	// printf("\n");
 
-	removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
-	width--;
+	GpuTimer timer;
+	timer.Start();
+	for (width; width > new_width; width--)
+	{
+		// Sum energy from bottom to top
+		computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
 
-	// Convert RGB to grayscale using device
-	// uint8_t * outPixels= (uint8_t *)malloc(width * height);
-	// dim3 blockSize(32, 32); // Default
-	// if (argc == 5)
-	// {
-	// 	blockSize.x = atoi(argv[3]);
-	// 	blockSize.y = atoi(argv[4]);
-	// } 
-	// convertRgb2Gray(inPixels, width, height, outPixels, true, blockSize); 
+		// Find seam with the least energy
+		findSeam(correctSumEnergy, trace, width, height, correctSeam);
 
-	// // Compute mean absolute error between host result and device result
-	// float err = computeError(outPixels, correctOutPixels, width * height);
-	// printf("Error between device result and host result: %f\n", err);
+		// Remove that seam
+		removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
+	}
+	timer.Stop();
+	float time = timer.Elapsed();
+	printf("Processing time (SeamCarving): %f ms\n\n", time);
 
-	// Write results to files
-	char * outFileNameBase = strtok(argv[2], "."); // Get rid of extension
-	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
-	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
-	
-	
-	//writePnm(outPixels, 1, width, height, concatStr(outFileNameBase, "_device.pnm"));
+	// Image after seam carving
+	writePnm(inPixels, width, height, concatStr(outFileNameBase, "_host.pnm"));
 
 	// Free memories
 	free(inPixels);
@@ -405,5 +404,4 @@ int main(int argc, char ** argv)
 	free(correctSumEnergy);
 	free(trace);
 	free(correctSeam);
-	//free(outPixels);
 }
