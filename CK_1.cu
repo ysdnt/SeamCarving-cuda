@@ -278,30 +278,26 @@ void findSeam(int * inPixels, int8_t * trace, int width, int height,
 	printf("Processing time (Seam): %f ms\n\n", time);
 }
 
-void removeSeam(int * inPixels, int8_t * seam, int width, int height,
-		int * outPixels)
+void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
 	GpuTimer timer;
 	timer.Start();
-
-	int inPixel_idx = 0;
-	for (int c = 1; c < width; c++)
+	int length = width * height;
+	for (int i = height - 1; i >= 0; i--)
 	{
-		if (inPixels[c] < inPixels[inPixel_idx])
-		{
-			inPixel_idx = c;
-		}
+		//printf("%i, ", seam[i]);
+		// 	printf("%i, ", correctSeam[i]);
+		// int src = 
+		// int dst = 
+		int j = 0;
+		memcpy(&inPixels_Sobel[seam[i]], &inPixels_Sobel[seam[i] + 1], length - seam[i] - 1);
+		memcpy(&inPixels[seam[i]], &inPixels[seam[i] + 1], (length - seam[i] - 1 - j) * sizeof(uchar3));
+		j++;
 	}
-	seam[0] = inPixel_idx;
-	for (int i = 1; i < height; i++)
-	{
-		inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
-		seam[i] = inPixel_idx;
-	}
-
+	//width--;
 	timer.Stop();
 	float time = timer.Elapsed();
-	printf("Processing time (Seam): %f ms\n\n", time);
+	printf("Processing time (removeSeam): %f ms\n\n", time);
 }
 
 // float computeError(uint8_t * a1, uint8_t * a2, int n)
@@ -372,6 +368,10 @@ int main(int argc, char ** argv)
 	// for (int i=0;i<height;i++){
 	// 	printf("%i, ", correctSeam[i]);
 	// }
+	// printf("\n");
+
+	removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
+	width--;
 
 	// Convert RGB to grayscale using device
 	// uint8_t * outPixels= (uint8_t *)malloc(width * height);
