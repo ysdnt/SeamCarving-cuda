@@ -285,8 +285,9 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	int length = width * height;
 	for (int i = height - 1; i >= 0; i--)
 	{
-		//printf("%i, ", seam[i]);
-		// 	printf("%i, ", correctSeam[i]);
+        printf("%i, ", length);
+		printf("%i, ", seam[i]);
+		printf("%i, ", (length - seam[i] - 1 - j));
 		// int src = 
 		// int dst = 
 		int j = 0;
