@@ -368,12 +368,12 @@ int main(int argc, char ** argv)
 	x_Sobel[5] = y_Sobel[7] = -2;
 
 	
-	// Convert RGB to grayscale not using device
+	// Convert RGB to grayscale
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
 	convertRgb2Gray(inPixels, width, height, correctOutPixels);
 	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
 
-	// Convert grayscale to sobel-grayscale not using device
+	// Convert grayscale to sobel-grayscale (energy)
 	uint8_t * correctOutSobelPixels= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
 	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
