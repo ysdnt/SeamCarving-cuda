@@ -453,33 +453,33 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	// float time = timer.Elapsed();
 	// printf("Processing time (removeSeam): %f ms\n\n", time);
 }
-void find2removeSeam(int new_width, uint8_t * correctOutPixels, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height, bool useDevice=false, dim3 blockSize=dim3(1, 1))
-{
-	GpuTimer timer;
-	timer.Start();
-	if (useDevice == false)
-	{
-		for (width; width > new_width; width--)
-		{
-			// Sum energy from bottom to top
-			computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
+// void find2removeSeam(int new_width, uint8_t * correctOutPixels, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height, bool useDevice=false, dim3 blockSize=dim3(1, 1))
+// {
+// 	GpuTimer timer;
+// 	timer.Start();
+// 	if (useDevice == false)
+// 	{
+// 		for (width; width > new_width; width--)
+// 		{
+// 			// Sum energy from bottom to top
+// 			computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
 
-			// Find seam with the least energy
-			findSeam(correctSumEnergy, trace, width, height, correctSeam);
+// 			// Find seam with the least energy
+// 			findSeam(correctSumEnergy, trace, width, height, correctSeam);
 
-			// Remove that seam
-			removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
-		}
-	}
-	else
-	{
-
-	}
-	timer.Stop();
-	float time = timer.Elapsed();
-	printf("Processing time find2removeSeam (%s): %f ms\n\n", 
-			useDevice == true? "use device" : "use host", time);
-}
+// 			// Remove that seam
+// 			removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
+// 		}
+// 	}
+// 	else
+// 	{
+		
+// 	}
+// 	timer.Stop();
+// 	float time = timer.Elapsed();
+// 	printf("Processing time find2removeSeam (%s): %f ms\n\n", 
+// 			useDevice == true? "use device" : "use host", time);
+// }
 
 
 
@@ -535,18 +535,42 @@ int main(int argc, char ** argv)
 
 	int new_width = 2 * width / 3;
 
-	// Find and remove seam using host
 	int * correctSumEnergy = (int *)malloc(width * height * sizeof(int));
 	int8_t * trace = (int8_t *)malloc(width * height);
 	int * correctSeam = (int *)malloc(height * sizeof(int));
-	find2removeSeam(new_width, correctOutPixels, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
 
-	// Find and remove seam using device
-	int * correctSumEnergyDevice = (int *)malloc(width * height * sizeof(int));
-	int8_t * traceDevice = (int8_t *)malloc(width * height);
-	int * correctSeamDevice = (int *)malloc(height * sizeof(int));
-	find2removeSeam(new_width, correctOutPixels, correctOutSobelPixels, correctSumEnergyDevice, correctSeamDevice, traceDevice, inPixels, width, height, true, blockSize);
+	GpuTimer timer;
+	timer.Start();
+	for (width; width > new_width; width--)
+	{
+		// Sum energy from bottom to top
+		computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
 
+		// Find seam with the least energy
+		findSeam(correctSumEnergy, trace, width, height, correctSeam);
+
+		// Remove that seam
+		removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
+	}
+	timer.Stop();
+	float time = timer.Elapsed();
+	printf("Processing time (SeamCarving): %f ms\n\n", time);
+
+	// Image after seam carving
+	writePnm(inPixels, width, height, concatStr(outFileNameBase, "_host.pnm"));
+	// // Find and remove seam using host
+	// int * correctSumEnergy = (int *)malloc(width * height * sizeof(int));
+	// int8_t * trace = (int8_t *)malloc(width * height);
+	// int * correctSeam = (int *)malloc(height * sizeof(int));
+	// find2removeSeam(new_width, correctOutPixels, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
+	// writePnm(inPixels, width, height, concatStr(outFileNameBase, "_seam_host.pnm"));
+
+	// // Find and remove seam using device
+	// int * correctSumEnergyDevice = (int *)malloc(width * height * sizeof(int));
+	// int8_t * traceDevice = (int8_t *)malloc(width * height);
+	// int * correctSeamDevice = (int *)malloc(height * sizeof(int));
+	// find2removeSeam(new_width, correctOutPixels, correctOutSobelPixels, correctSumEnergyDevice, correctSeamDevice, traceDevice, inPixels, width, height, true, blockSize);
+	// writePnm(inPixels, width, height, concatStr(outFileNameBase, "_seam_device.pnm"));
 
 	// Free memories
 	free(inPixels);
