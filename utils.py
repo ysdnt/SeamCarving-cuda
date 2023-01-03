@@ -12,6 +12,7 @@ def show_pnm(file_name):
     pixels = np.array(vals[4:], dtype=np.uint8).reshape((h, w, 3))
   else:
     return None
+  print("Image size (width x height):", w, "x", h)
   return Image.fromarray(pixels)
 
 def show_matrix(matrix_file):
