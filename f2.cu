@@ -241,7 +241,7 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 		uint8_t filterWidth, bool useDevice=false, dim3 blockSize=dim3(1, 1))
 {
 	GpuTimer timer2;
-	
+	timer2.Start();
 	if (useDevice == false)
 	{
 		for (int outPixelsR = 0; outPixelsR < height; outPixelsR++)
@@ -309,9 +309,10 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 		CHECK(cudaFree(d_x_Sobel));
 		CHECK(cudaFree(d_y_Sobel));
 	}
-	
-	// printf("Processing time (%s): %f ms\n", 
-    // 		useDevice == true? "use device" : "use host", time);
+	timer2.Stop();
+	float res = timer2.Elapsed();
+	printf("Processing time (%s): %f ms\n", 
+    		useDevice == true? "use device" : "use host", res);
 }
 
 float computeError(uint8_t * a1, uint8_t * a2, int n)
