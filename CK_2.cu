@@ -66,7 +66,7 @@ void readPnm(char * fileName,
 		numChannels = 1;
 	else if (strcmp(type, "P3") == 0)
 		numChannels = 3;
-	else // In this exercise, we don't touch other types
+	else // In this exercise, we don't touch other types.
 	{
 		fclose(f);
 		printf("Cannot read %s\n", fileName); 
