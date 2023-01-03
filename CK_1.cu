@@ -322,7 +322,25 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	// printf("Processing time (removeSeam): %f ms\n\n", time);
 }
 
+void find2removeSeam(int new_width, uint8_t * correctOutPixels, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height)
+{
+	GpuTimer timer;
+	timer.Start();
+	for (width; width > new_width; width--)
+	{
+		// Sum energy from bottom to top
+		computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
 
+		// Find seam with the least energy
+		findSeam(correctSumEnergy, trace, width, height, correctSeam);
+
+		// Remove that seam
+		removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
+	}
+	timer.Stop();
+	float time = timer.Elapsed();
+	printf("Processing time (SeamCarving): %f ms\n\n", time);
+}
 
 // float computeError(uint8_t * a1, uint8_t * a2, int n)
 // {
@@ -385,22 +403,7 @@ int main(int argc, char ** argv)
 	int8_t * trace = (int8_t *)malloc(width * height);
 	int * correctSeam = (int *)malloc(height * sizeof(int));
 
-	GpuTimer timer;
-	timer.Start();
-	for (width; width > new_width; width--)
-	{
-		// Sum energy from bottom to top
-		computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
-
-		// Find seam with the least energy
-		findSeam(correctSumEnergy, trace, width, height, correctSeam);
-
-		// Remove that seam
-		removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
-	}
-	timer.Stop();
-	float time = timer.Elapsed();
-	printf("Processing time (SeamCarving): %f ms\n\n", time);
+	find2removeSeam(new_width, correctOutPixels, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
 
 	// Image after seam carving
 	writePnm(inPixels, width, height, concatStr(outFileNameBase, "_host.pnm"));
