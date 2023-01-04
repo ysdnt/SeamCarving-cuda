@@ -425,10 +425,12 @@ __global__ void findSeamKernel(int *inPixels, int8_t *trace, int width, int heig
 {
     int inPixel_idx = 0;
     int c = blockIdx.x * blockDim.x + threadIdx.x;
-    if (c < width && inPixels[c] < inPixels[inPixel_idx])
+    if (c < width )
     {
-        inPixel_idx = c;
+		if (inPixels[c] < inPixels[inPixel_idx])
+        	inPixel_idx = c;
     }
+	__syncthreads();
     seam[0] = inPixel_idx;
 
     int i = blockIdx.y * blockDim.y + threadIdx.y;
@@ -453,8 +455,7 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	}
 }
 
-__global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int *seam,
-									int width, int height)
+__global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int *seam, int width, int height)
 {
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     if (i < height)
@@ -469,10 +470,7 @@ __global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int 
 }
 
 
-void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels,
-						int * correctSumEnergy, int * correctSeam, int8_t * trace,
-						uchar3 * inPixels, int width, int height,
-						bool useDevice=false, dim3 blockSize=dim3(1, 1))
+void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height, bool useDevice=false, dim3 blockSize=dim3(1, 1))
 {
 	GpuTimer timer;
 	timer.Start();
@@ -510,15 +508,15 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels,
 			CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
 			CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
 
-			//findSeam(correctSumEnergy, trace, i, height, correctSeam);
-			findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
+			findSeam(correctSumEnergy, trace, i, height, correctSeam);
+			// findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
 
-			//CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
+			CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
 
-			//removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
-			removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
+			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
+			// removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
 		}
-		CHECK(cudaMemcpy(inPixels, d_inPixels, height * width * sizeof(uchar3), cudaMemcpyDeviceToHost));
+		// CHECK(cudaMemcpy(inPixels, d_inPixels, height * width * sizeof(uchar3), cudaMemcpyDeviceToHost));
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
@@ -556,7 +554,7 @@ int main(int argc, char ** argv)
 	// Convert RGB to grayscale using device
 	uint8_t * outPixels= (uint8_t *)malloc(width * height);
 	dim3 blockSize(32, 32); // Default
-	convertRgb2Gray(inPixels, width, height, outPixels, true, blockSize);
+	convertRgb2Gray(inPixelsDevice, width, height, outPixels, true, blockSize);
 	writePnm(outPixels, width, height, concatStr(outFileNameBase, "_gray_device.pnm"));
 
 	// Compute mean absolute error between host result and device result
@@ -570,7 +568,7 @@ int main(int argc, char ** argv)
 
 	// Convert grayscale to sobel-grayscale (energy) using device 
 	uint8_t * correctOutSobelPixelsDevice= (uint8_t *)malloc(width * height);
-	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixelsDevice, x_Sobel, y_Sobel, filterWidth, true, blockSize);
+	convertGray2Sobel(outPixels, width, height, correctOutSobelPixelsDevice, x_Sobel, y_Sobel, filterWidth, true, blockSize);
 	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_sobel_device.pnm"));
 
 	int new_width = 2 * width / 3;
@@ -580,6 +578,7 @@ int main(int argc, char ** argv)
 	int8_t * trace = (int8_t *)malloc(width * height * sizeof(int8_t));
 	int * correctSeam = (int *)malloc(height * sizeof(int));
 	int i = width;
+	int k = width;
 	find2removeSeam(new_width, i, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
 	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_seam_host.pnm"));
 
@@ -587,9 +586,9 @@ int main(int argc, char ** argv)
 	int * correctSumEnergyDevice = (int *)malloc(width * height * sizeof(int));
 	int8_t * traceDevice = (int8_t *)malloc(width * height);
 	int * correctSeamDevice = (int *)malloc(height * sizeof(int));
-	int k = width;
+
 	find2removeSeam(new_width,k, correctOutSobelPixelsDevice, correctSumEnergyDevice, correctSeamDevice, traceDevice, inPixelsDevice, width, height, true, blockSize);
-	writePnm(inPixels, k, height, concatStr(outFileNameBase, "_seam_device.pnm"));
+	writePnm(inPixelsDevice, k, height, concatStr(outFileNameBase, "_seam_device.pnm"));
 
 	// Free memories
 	free(inPixels);
