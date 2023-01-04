@@ -395,6 +395,11 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 	}
 }
 
+__global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
+{
+	//
+}
+
 void findSeam(int * inPixels, int8_t * trace, int width, int height,
 		int * seam)
 {
@@ -419,17 +424,18 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 {
 
 	int length = width * height;
-	// Đi từ pixel dưới cùng của seam
 	for (int i = height - 1; i >= 0; i--)
 	{
 		int j = 0;
-		// Dịch chuyển các pixels bên phải vị trí pixel seam qua bên trái 1 pixel 
-		// ở ảnh energy và ảnh màu
 		memcpy(&inPixels_Sobel[seam[i]], &inPixels_Sobel[seam[i] + 1], length - seam[i] - 1 - j);
 		memcpy(&inPixels[seam[i]], &inPixels[seam[i] + 1], (length - seam[i] - 1 - j) * sizeof(uchar3));
 		j++;
 	}
 }
+
+
+
+
 void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height, bool useDevice=false, dim3 blockSize=dim3(1, 1))
 {
 	GpuTimer timer;
@@ -445,8 +451,24 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 	}
 	else
 	{
+		dim3 gridSize((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
+		uchar3 * d_inPixels;
+		uint8_t * d_correctOutSobelPixels;
+		int * d_correctSumEnergy;
+		int * d_correctSeam;
+		int8_t * d_trace;
+		CHECK(cudaMalloc(&d_inPixels, height * width * sizeof(uchar3)));
+		CHECK(cudaMalloc(&d_correctOutSobelPixels, height * width * sizeof(uint8_t)));
+		CHECK(cudaMalloc(&d_correctSumEnergy, height * width * sizeof(int)));
+		CHECK(cudaMalloc(&d_correctSeam, height * sizeof(int)));
+		CHECK(cudaMalloc(&d_trace, height * width * sizeof(int8_t)));
+
+		CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
+
+
 		for (i; i > new_width; i--)
 		{
+			//computeSumEnergyKernel<<<gridSize, blockSize>>>(correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
 			computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
 			findSeam(correctSumEnergy, trace, i, height, correctSeam);
 			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
@@ -511,7 +533,7 @@ int main(int argc, char ** argv)
 
 	// Find and remove seam using host
 	int * correctSumEnergy = (int *)malloc(width * height * sizeof(int));
-	int8_t * trace = (int8_t *)malloc(width * height);
+	int8_t * trace = (int8_t *)malloc(width * height * sizeof(int8_t));
 	int * correctSeam = (int *)malloc(height * sizeof(int));
 	int i = width;
 	find2removeSeam(new_width, i, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
