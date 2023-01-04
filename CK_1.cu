@@ -191,16 +191,25 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 	printf("Processing time (Gray2Sobel): %f ms\n\n", time);
 }
 
+void computeEnergy(uint8_t * inPixels, int width, int height,
+		int * outPixels)
+{
+	for (int c = 0; c < width; c++)
+	{
+		outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
+	}
+}
+
 void computeSumEnergy(uint8_t * inPixels, int width, int height,
 		int * outPixels, int8_t * trace)
 {
 	// GpuTimer timer;
 	// timer.Start();
 	// Hàng dưới cùng energy giữ nguyên
-	for (int c = 0; c < width; c++)
-	{
-		outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
-	}
+	// for (int c = 0; c < width; c++)
+	// {
+	// 	outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
+	// }
 	// Mỗi ô ở hàng trên dựa vào 1 trong 3 ô nhỏ nhất ở hàng dưới (trái, giữa, phải)
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{	
@@ -390,6 +399,7 @@ int main(int argc, char ** argv)
 	for (width; width > new_width; width--)
 	{
 		// Sum energy from bottom to top
+		computeEnergy(correctOutSobelPixels, width, height, correctSumEnergy);
 		computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
 
 		// Find seam with the least energy
