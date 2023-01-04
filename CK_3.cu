@@ -153,12 +153,9 @@ float computeError(uint8_t * a1, uint8_t * a2, int n)
 
 __global__ void convertRgb2GrayKernel(uchar3 * inPixels, int width, int height, 
 		uint8_t * outPixels)
-{
-	// TODO
-    // Reminder: gray = 0.299*red + 0.587*green + 0.114*blue  
+{  
 	int r = blockIdx.y * blockDim.y + threadIdx.y;
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
-
 	if(r < height && c < width)
 	{
 		int i = r * width + c;
@@ -229,10 +226,27 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 __global__ void convertGray2SobelKernel(uint8_t * inPixels, int width, int height, 
 		uint8_t * outPixels, int8_t * x_Sobel, int8_t * y_Sobel, uint8_t filterWidth)
 {
-	
+	extern __shared__ uint8_t s_inPixels[];
 	int outPixelsR = blockIdx.y * blockDim.y + threadIdx.y;
 	int outPixelsC = blockIdx.x * blockDim.x + threadIdx.x;
-
+	int s_width = blockDim.x + filterWidth - 1;
+	int s_height = blockDim.y + filterWidth - 1;
+	int s_length = s_width * s_height;
+	int nPixels_thread = (s_length - 1) / (blockDim.x * blockDim.y) + 1;
+	int s_index = threadIdx.y * blockDim.x + threadIdx.x;
+	int s_first_r = blockIdx.y * blockDim.y - filterWidth / 2;
+	int s_first_c = blockIdx.x * blockDim.x - filterWidth / 2;
+	for (int i = 0; i < nPixels_thread; i++)
+	{
+		int pos = s_index * nPixels_thread + i;
+		if (pos >= s_length) break;
+		int in_R = pos / s_width + s_first_r;
+		int in_C = pos % s_width + s_first_c;
+		in_R = min(max(0, in_R), height - 1);
+		in_C = min(max(0, in_C), width - 1);
+		s_inPixels[pos] = inPixels[in_R * width + in_C];
+	}
+	__syncthreads();
 	if(outPixelsR < height && outPixelsC < width)
 	{
 		int outPixel_x = 0;       
@@ -243,11 +257,9 @@ __global__ void convertGray2SobelKernel(uint8_t * inPixels, int width, int heigh
 				{
 					int8_t filterVal_x = x_Sobel[filterR * filterWidth + filterC];
 					int8_t filterVal_y = y_Sobel[filterR * filterWidth + filterC];
-					int inPixelsR = outPixelsR - filterWidth/2 + filterR;
-					int inPixelsC = outPixelsC - filterWidth/2 + filterC;
-					inPixelsR = min(max(0, inPixelsR), height - 1);
-					inPixelsC = min(max(0, inPixelsC), width - 1);
-					uint8_t inPixel = inPixels[inPixelsR * width + inPixelsC];
+					int inPixelsR = threadIdx.y + filterR;
+					int inPixelsC = threadIdx.x + filterC;
+					uint8_t inPixel = s_inPixels[inPixelsR * s_width + inPixelsC];
 					outPixel_x += filterVal_x * inPixel;
 					outPixel_y += filterVal_y * inPixel;
 				}
@@ -308,7 +320,8 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 		CHECK(cudaMemcpy(d_y_Sobel, y_Sobel, nBytesFilter, cudaMemcpyHostToDevice));
 		dim3 gridSize((width - 1) / blockSize.x + 1, 
                 (height - 1) / blockSize.y + 1);
-		convertGray2SobelKernel<<<gridSize, blockSize>>>(d_inPixels, width, height, d_outPixels, d_x_Sobel, d_y_Sobel, filterWidth);
+		size_t kernelBytes = (blockSize.x + filterWidth - 1) * (blockSize.y + filterWidth - 1) * sizeof(uint8_t);
+		convertGray2SobelKernel<<<gridSize, blockSize, kernelBytes>>>(d_inPixels, width, height, d_outPixels, d_x_Sobel, d_y_Sobel, filterWidth);
 		cudaError_t errSync  = cudaGetLastError();
 		cudaError_t errAsync = cudaDeviceSynchronize();
 		if (errSync != cudaSuccess) 
@@ -522,11 +535,11 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			//computeSumEnergyKernel<<<gridSize, blockSize>>>(correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
 
 
-			CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
-			CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
-			// findSeam(correctSumEnergy, trace, i, height, correctSeam);
-			findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
-			CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
+			// CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
+			// CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
+			findSeam(correctSumEnergy, trace, i, height, correctSeam);
+			// findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
+			// CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
 
 
 			// CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
