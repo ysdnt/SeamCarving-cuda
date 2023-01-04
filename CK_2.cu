@@ -344,8 +344,7 @@ __global__ void computeEnergyKernel(uint8_t * inPixels, int width, int height, i
 	}
 }
 
-void computeSumEnergy(uint8_t * inPixels, int width, int height,
-		int * outPixels, int8_t * trace)
+void computeSumEnergy(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
 {
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{	
@@ -436,6 +435,7 @@ __global__ void findSeamKernel(int *inPixels, int8_t *trace, int width, int heig
 {
     int inPixel_idx = 0;
     int c = blockIdx.x * blockDim.x + threadIdx.x;
+	c++;
     if (c < width)
     {
 		if (inPixels[c] < inPixels[inPixel_idx])
@@ -446,6 +446,7 @@ __global__ void findSeamKernel(int *inPixels, int8_t *trace, int width, int heig
 	__syncthreads();
     seam[0] = inPixel_idx;
     int i = blockIdx.y * blockDim.y + threadIdx.y;
+	i++;
     if (i < height)
     {
         inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
@@ -516,7 +517,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		{
 			// computeEnergy(correctOutSobelPixels, i, height, correctSumEnergy);
 			computeEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
-			CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
+			// CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
 
 
 			computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
@@ -592,7 +593,7 @@ int main(int argc, char ** argv)
 	convertGray2Sobel(outPixels, width, height, correctOutSobelPixelsDevice, x_Sobel, y_Sobel, filterWidth, true, blockSize);
 	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_sobel_device.pnm"));
 
-	int new_width = 2 * width / 3;
+	int new_width = 2 * width / 3; //Default
 	int i = width;
 	int k = width;
 
