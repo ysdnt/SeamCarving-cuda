@@ -505,13 +505,13 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			//computeSumEnergyKernel<<<gridSize, blockSize>>>(correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
 			computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
 
-			CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
-			CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
+			// CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
+			// CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
 
 			findSeam(correctSumEnergy, trace, i, height, correctSeam);
 			// findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
 
-			CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
+			// CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
 
 			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
 			// removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
@@ -572,21 +572,20 @@ int main(int argc, char ** argv)
 	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_sobel_device.pnm"));
 
 	int new_width = 2 * width / 3;
+	int i = width;
+	int k = width;
 
 	// Find and remove seam using host
 	int * correctSumEnergy = (int *)malloc(width * height * sizeof(int));
 	int8_t * trace = (int8_t *)malloc(width * height * sizeof(int8_t));
 	int * correctSeam = (int *)malloc(height * sizeof(int));
-	int i = width;
-	int k = width;
 	find2removeSeam(new_width, i, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
 	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_seam_host.pnm"));
 
 	// Find and remove seam using device
 	int * correctSumEnergyDevice = (int *)malloc(width * height * sizeof(int));
-	int8_t * traceDevice = (int8_t *)malloc(width * height);
+	int8_t * traceDevice = (int8_t *)malloc(width * height* sizeof(int8_t));
 	int * correctSeamDevice = (int *)malloc(height * sizeof(int));
-
 	find2removeSeam(new_width,k, correctOutSobelPixelsDevice, correctSumEnergyDevice, correctSeamDevice, traceDevice, inPixelsDevice, width, height, true, blockSize);
 	writePnm(inPixelsDevice, k, height, concatStr(outFileNameBase, "_seam_device.pnm"));
 
