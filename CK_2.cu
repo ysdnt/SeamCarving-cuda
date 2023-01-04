@@ -453,7 +453,8 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	}
 }
 
-__global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int *seam, int width, int height)
+__global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int *seam,
+									int width, int height)
 {
     int i = blockIdx.y * blockDim.y + threadIdx.y;
     if (i < height)
@@ -468,7 +469,10 @@ __global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int 
 }
 
 
-void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height, bool useDevice=false, dim3 blockSize=dim3(1, 1))
+void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels,
+						int * correctSumEnergy, int * correctSeam, int8_t * trace,
+						uchar3 * inPixels, int width, int height,
+						bool useDevice=false, dim3 blockSize=dim3(1, 1))
 {
 	GpuTimer timer;
 	timer.Start();
