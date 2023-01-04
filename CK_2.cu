@@ -328,21 +328,25 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 }
 
 //in: inPixels				//out: outPixels, trace
-void computeEnergy(uint8_t * inPixels, int width, int height,
-		int * outPixels)
+void computeEnergy(uint8_t * inPixels, int width, int height, int * outPixels)
 {
 	for (int c = 0; c < width; c++)
 	{
 		outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
 	}
 }
+__global__ void computeEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels)
+{
+	int c = blockIdx.x * blockDim.x + threadIdx.x;
+	if (c < width)
+	{
+		outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
+	}
+}
+
 void computeSumEnergy(uint8_t * inPixels, int width, int height,
 		int * outPixels, int8_t * trace)
 {
-	// for (int c = 0; c < width; c++)
-	// {
-	// 	outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
-	// }
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{	
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
@@ -506,27 +510,32 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		CHECK(cudaMalloc(&d_correctSeam, height * sizeof(int)));
 		CHECK(cudaMalloc(&d_trace, height * width * sizeof(int8_t)));
 
-		//CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
-
+		CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
 
 		for (i; i > new_width; i--)
 		{
-			computeEnergy(correctOutSobelPixels, i, height, correctSumEnergy);
-			//computeSumEnergyKernel<<<gridSize, blockSize>>>(correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
+			// computeEnergy(correctOutSobelPixels, i, height, correctSumEnergy);
+			computeEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
+			CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
+
+
 			computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
+			//computeSumEnergyKernel<<<gridSize, blockSize>>>(correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
+			// CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
+			// CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
 
-			CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
-			CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
 
-			// findSeam(correctSumEnergy, trace, i, height, correctSeam);
-			findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
+			findSeam(correctSumEnergy, trace, i, height, correctSeam);
+			// findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
+			// CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
 
-			CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
 
-			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
 			// CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
-			// CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));			
+			// CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
+			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
 			// removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
+			
+			
 		}
 		// CHECK(cudaMemcpy(inPixels, d_inPixels, height * width * sizeof(uchar3), cudaMemcpyDeviceToHost));
 	}
