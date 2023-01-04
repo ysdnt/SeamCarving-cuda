@@ -435,7 +435,6 @@ __global__ void findSeamKernel(int *inPixels, int8_t *trace, int width, int heig
 {
     int inPixel_idx = 0;
     int c = blockIdx.x * blockDim.x + threadIdx.x;
-	c++;
     if (c < width)
     {
 		if (inPixels[c] < inPixels[inPixel_idx])
@@ -446,7 +445,6 @@ __global__ void findSeamKernel(int *inPixels, int8_t *trace, int width, int heig
 	__syncthreads();
     seam[0] = inPixel_idx;
     int i = blockIdx.y * blockDim.y + threadIdx.y;
-	i++;
     if (i < height)
     {
         inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
@@ -531,14 +529,14 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			// CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
 
 
-			// CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
-			// CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
-			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
-			// removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
+			CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
+			CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
+			// removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
+			removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
 			
 			
 		}
-		// CHECK(cudaMemcpy(inPixels, d_inPixels, height * width * sizeof(uchar3), cudaMemcpyDeviceToHost));
+		CHECK(cudaMemcpy(inPixels, d_inPixels, height * width * sizeof(uchar3), cudaMemcpyDeviceToHost));
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
