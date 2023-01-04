@@ -338,7 +338,6 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
-	cudaDeviceSynchronize();
 	CHECK(cudaGetLastError());
 	printf("Processing time convertGray2Sobel (%s): %f ms\n\n", 
 			useDevice == true? "use device" : "use host", time);
