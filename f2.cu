@@ -163,11 +163,6 @@ void convertRgb2Gray(uint8_t * inPixels, int width, int height,
 	}
 	else // use device
 	{
-		cudaDeviceProp devProp;
-		cudaGetDeviceProperties(&devProp, 0);
-		printf("GPU name: %s\n", devProp.name);
-		printf("GPU compute capability: %d.%d\n", devProp.major, devProp.minor);
-
 		// TODO: Allocate device memories
 		uint8_t * d_inPixels;
 		uint8_t * d_outPixels;
@@ -198,7 +193,7 @@ void convertRgb2Gray(uint8_t * inPixels, int width, int height,
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
-	printf("Processing time (%s): %f ms\n\n", 
+	printf("Processing time Rgb2Gray (%s): %f ms\n\n", 
 			useDevice == true? "use device" : "use host", time);
 }
 
@@ -271,11 +266,6 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 	}
 	else
 	{
-		cudaDeviceProp devProp;
-		cudaGetDeviceProperties(&devProp, 0);
-		printf("GPU name: %s\n", devProp.name);
-		printf("GPU compute capability: %d.%d\n", devProp.major, devProp.minor);
-
 		uint8_t * d_inPixels;
 		uint8_t * d_outPixels;
 		int8_t * d_x_Sobel;
@@ -311,7 +301,7 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 	}
 	timer2.Stop();
 	float res = timer2.Elapsed();
-	printf("Processing time (%s): %f ms\n", 
+	printf("Processing time Gray2Sobel (%s): %f ms\n", 
     		useDevice == true? "use device" : "use host", res);
 }
 
