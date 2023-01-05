@@ -154,15 +154,21 @@ float computeError(uint8_t * a1, uint8_t * a2, int n)
 __global__ void convertRgb2GrayKernel(uchar3 * inPixels, int width, int height, 
 		uint8_t * outPixels)
 {  
+	extern __shared__ uchar3 s_in[];
 	int r = blockIdx.y * blockDim.y + threadIdx.y;
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
 	if(r < height && c < width)
 	{
 		int i = r * width + c;
-		uint8_t red = inPixels[i].x;
-		uint8_t green = inPixels[i].y;
-		uint8_t blue = inPixels[i].z;
-		outPixels[i] = 0.299f * red + 0.587f * green + 0.114f * blue;
+		s_in[threadIdx.y * blockDim.x + threadIdx.x] = inPixels[i];
+		__syncthreads();
+		if(threadIdx.y < blockDim.y && threadIdx.x < blockDim.x)
+        {
+            uint8_t red = s_in[threadIdx.y * blockDim.x + threadIdx.x].x;
+            uint8_t green = s_in[threadIdx.y * blockDim.x + threadIdx.x].y;
+            uint8_t blue = s_in[threadIdx.y * blockDim.x + threadIdx.x].z;
+            outPixels[i] = (red + 2 * green + blue) >> 2;
+        }
 	}
 
 }
@@ -201,7 +207,8 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 
 		// TODO: Set grid size and call kernel (remember to check kernel error)
 		dim3 gridSize((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
-		convertRgb2GrayKernel<<<gridSize, blockSize>>>(d_inPixels, width, height, d_outPixels);
+		size_t kernelBytes = (blockSize.x) * (blockSize.y) * sizeof(uchar3);
+		convertRgb2GrayKernel<<<gridSize, blockSize, kernelBytes>>>(d_inPixels, width, height, d_outPixels);
 
 		cudaError_t errSync  = cudaGetLastError();
 		cudaError_t errAsync = cudaDeviceSynchronize();

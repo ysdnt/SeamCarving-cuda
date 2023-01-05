@@ -299,7 +299,7 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 		int8_t * d_x_Sobel;
 		int8_t * d_y_Sobel;
 		size_t nBytes = height * width * sizeof(uint8_t);
-		size_t nBytesFilter = height * width * sizeof(int8_t);
+		size_t nBytesFilter = filterWidth  * filterWidth  * sizeof(int8_t);
 		CHECK(cudaMalloc(&d_inPixels, nBytes));
 		CHECK(cudaMalloc(&d_outPixels, nBytes));
 		CHECK(cudaMalloc(&d_x_Sobel, nBytesFilter));
