@@ -560,24 +560,66 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 		j++;
 	}
 }
+
+
 __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
-	int c = blockIdx.x * blockDim.x + threadIdx.x;
-	int length = width * height;
-	int j = 0;
-	for (int i = height - 1; i >= 0; i--)
-	{
+	// // Calculate the index of the current thread
+    // int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    // // Check if the thread is within the bounds of the image
+    // if (idx < width * height)
+    // {
+    //     // Calculate the row and column indices for the current thread
+    //     int row = idx / width;
+    //     int col = idx % width;
+
+    //     // Check if the current thread is to the right of the seam
+    //     if (col > seam[row])
+    //     {
+    //         // Shift the data to the left by copying the data from the right of the seam to the location of the seam
+    //         inPixels_Sobel[idx] = inPixels_Sobel[idx + 1];
+    //         inPixels[idx] = inPixels[idx + 1];
+    //     }
+    // }
+
+	// Calculate the row and column indices for the current thread
+    int row = blockIdx.y;
+    int col = threadIdx.x;
+
+    // Calculate the index of the current thread
+    int idx = row * width + col;
+
+    // Check if the current thread is within the bounds of the image
+    if (row < height && col < width)
+    {
+        // Check if the current thread is to the right of the seam
+        if (col > seam[row])
+        {
+            // Shift the data to the left by copying the data from the right of the seam to the location of the seam
+            inPixels_Sobel[idx] = inPixels_Sobel[idx + 1];
+            inPixels[idx] = inPixels[idx + 1];
+        }
+    }
+
+	// int c = blockIdx.x * blockDim.x + threadIdx.x;
+	// int length = width * height;
+	// int j = 0;
+	// for (int i = height - 1; i >= 0; i--)
+	// {
+	// 	uint8_t t1 = inPixels_Sobel[seam[i] + 1 + c];
+	// 	uchar3 t2 = inPixels[seam[i] + 1 + c];
+	// 	if (c < length - s_seam[i] - 1 - j)
+	// 	{
+			
+	// 		inPixels_Sobel[seam[i] + c] = t1;
+	// 		inPixels[seam[i] + c] = t2;
+	// 	}
 		
-		if (c < width - seam[i] - 1 - j)
-		{
-			uint8_t t1 = inPixels_Sobel[seam[i] + 1 + c];
-			uchar3 t2 = inPixels[seam[i] + 1 + c];
-			inPixels_Sobel[seam[i] + c] = t1;
-			inPixels[seam[i] + c] = t2;
-		}
-		__syncthreads();
-		j++;
-	}
+	// 	__syncthreads();
+	// 	j++;
+	// }
+	
 }
 
 void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height, bool useDevice=false, dim3 blockSize=dim3(1, 1))
@@ -624,6 +666,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		dim3 newBlockSize(blockSize.x * blockSize.y);
 		dim3 newGridSizeX((width - 1) / newBlockSize.x + 1);
 		dim3 newGridSize((width * height - 1) / newBlockSize.x + 1);
+		dim3 GridSizeNew(width, height);
 
 		for (i; i > new_width; i--)
 		{
@@ -660,10 +703,12 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			// for (int t=0;t<300;t++){printf("%i, ", correctSumEnergy[t]);}
 			//printf("\ncorrectSeam\n");
 			CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
-			CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
+			//CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
 			//removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
-			removeSeamKernel<<<newGridSize, newBlockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
-			//break;
+			//size_t kernelBytes = height * sizeof(int);
+			removeSeamKernel<<<GridSizeNew, 1>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
+			// i--;
+			// break;
 			
 		}
 		CHECK(cudaMemcpy(inPixels, d_inPixels, height * i * sizeof(uchar3), cudaMemcpyDeviceToHost));
