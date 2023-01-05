@@ -444,8 +444,13 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 
 __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
 {
-	extern __shared__ uint8_t s_outPixels[];
+	extern __shared__ int s_outPixels[];
 	int outPixelsC = blockIdx.x * blockDim.x + threadIdx.x;
+	if (outPixelsC < width)
+	{
+		s_outPixels[width + outPixelsC] = outPixels[(height - 1) * width + outPixelsC];
+	}
+
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
@@ -455,8 +460,10 @@ __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height
 			if (outPixelsC == 0)
 			{
 				inPixel_cur = inPixels[outPixelsR * width];
-				outPixel_mid = outPixels[(outPixelsR + 1) * width];
-				outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
+				// outPixel_mid = outPixels[(outPixelsR + 1) * width];
+				// outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
+				outPixel_mid = s_outPixels[width + outPixelsC];
+				outPixel_right = s_outPixels[width + outPixelsC + 1];
 				if (outPixel_mid < outPixel_right)
 				{
 					temp = outPixel_mid;
@@ -469,12 +476,15 @@ __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height
 				}
 				temp_sum = inPixel_cur + temp;
 				outPixels[outPixelsR * width] = temp_sum;
+				s_outPixels[outPixelsC] = temp_sum;
 			}
 			else if (outPixelsC == width - 1)
 			{
 				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
-				outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
-				outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
+				// outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
+				// outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
+				outPixel_mid = s_outPixels[width + outPixelsC];
+				outPixel_left = s_outPixels[width + outPixelsC - 1];
 				if (outPixel_mid < outPixel_left)
 				{
 					temp = outPixel_mid;
@@ -487,13 +497,17 @@ __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height
 				}
 				temp_sum = inPixel_cur + temp;
 				outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
+				s_outPixels[outPixelsC] = temp_sum;
 			}
 			else
 			{
 				inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
-				outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
-				outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
-				outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
+				// outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
+				// outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
+				// outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
+				outPixel_left = s_outPixels[width + outPixelsC - 1];
+				outPixel_mid = s_outPixels[width + outPixelsC];
+				outPixel_right = s_outPixels[width + outPixelsC + 1];
 				if (outPixel_mid < outPixel_right)
 				{
 					temp = outPixel_mid;
@@ -511,7 +525,10 @@ __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height
 				}
 				temp_sum = inPixel_cur + temp;
 				outPixels[outPixelsR * width + outPixelsC] = temp_sum;
+				s_outPixels[outPixelsC] = temp_sum;
 			}
+			__syncthreads();
+			s_outPixels[width + outPixelsC] = s_outPixels[outPixelsC];
 			__syncthreads();
 		}
 	}
@@ -643,7 +660,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 
 			// computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
 			//computeSumEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
-			size_t kernelBytes = i * sizeof(int);
+			size_t kernelBytes = 2 * i * sizeof(int);
 			computeSumEnergyKernel<<<newGridSizeX, newBlockSize, kernelBytes>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
 			
 			// CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
