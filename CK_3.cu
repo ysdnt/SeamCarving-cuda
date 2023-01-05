@@ -364,112 +364,208 @@ __global__ void computeEnergyKernel(uint8_t * inPixels, int width, int height, i
 	}
 }
 
-void computeSumEnergy(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
+void computeSumEnergy(uint8_t * inPixels, int width, int height,
+		int * outPixels, int8_t * trace)
 {
+	// GpuTimer timer;
+	// timer.Start();
+
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
-	{	
+	{
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
 		uint8_t inPixel_cur;
-		inPixel_cur = inPixels[outPixelsR * width];
-		outPixel_mid = outPixels[(outPixelsR + 1) * width];
-		outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
-		if (outPixel_mid < outPixel_right)
+		for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
 		{
-			temp = outPixel_mid;
-			trace[outPixelsR * width] = 0;
-		}
-		else
-		{
-			temp = outPixel_right;
-			trace[outPixelsR * width] = 1;
-		}
-		temp_sum = inPixel_cur + temp;
-		outPixels[outPixelsR * width] = temp_sum;
-		for (int outPixelsC = 1; outPixelsC < width - 1; outPixelsC++)
-		{
-			inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
-			outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
-			outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
-			outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
-			if (outPixel_mid < outPixel_right)
+			if (outPixelsC == 0)
 			{
-				temp = outPixel_mid;
-				trace[outPixelsR * width + outPixelsC] = 0;
+				inPixel_cur = inPixels[outPixelsR * width];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width] = 0;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width] = temp_sum;
 			}
-			else if (outPixel_left < outPixel_right)
+			else if (outPixelsC == width - 1)
 			{
-				temp = outPixel_left;
-				trace[outPixelsR * width + outPixelsC] = -1;
+				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
+				outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
+				outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
+				if (outPixel_mid < outPixel_left)
+				{
+					temp = outPixel_mid;
+					trace[(outPixelsR + 1) * width - 1] = 0;
+				}
+				else
+				{
+					temp = outPixel_left;
+					trace[(outPixelsR + 1) * width - 1] = -1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
 			}
 			else
 			{
-				temp = outPixel_right;
-				trace[outPixelsR * width + outPixelsC] = 1;
+				inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
+				outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width + outPixelsC] = 0;
+				}
+				else if (outPixel_left < outPixel_right)
+				{
+					temp = outPixel_left;
+					trace[outPixelsR * width + outPixelsC] = -1;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width + outPixelsC] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width + outPixelsC] = temp_sum;
 			}
-			temp_sum = inPixel_cur + temp;
-			outPixels[outPixelsR * width + outPixelsC] = temp_sum;
 		}
-		inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
-		outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
-		outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
-		if (outPixel_mid < outPixel_left)
-		{
-			temp = outPixel_mid;
-			trace[(outPixelsR + 1) * width - 1] = 0;
-		}
-		else
-		{
-			temp = outPixel_left;
-			trace[(outPixelsR + 1) * width - 1] = -1;
-		}
-		temp_sum = inPixel_cur + temp;
-		outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
 	}
+	// timer.Stop();
+	// float time = timer.Elapsed();
+	// printf("Processing time (SumEnergy): %f ms\n\n", time);
 }
 
 __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
 {
 	//
-}
-
-void findSeam(int * inPixels, int8_t * trace, int width, int height, int * seam)
-{
-
-	int inPixel_idx = 0;
-	for (int c = 1; c < width; c++)
+	int outPixelsC = blockIdx.x * blockDim.x + threadIdx.x;
+	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{
-		if (inPixels[c] < inPixels[inPixel_idx])
+		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
+		uint8_t inPixel_cur;
+		if (outPixelsC < width)
 		{
-			inPixel_idx = c;
+			if (outPixelsC == 0)
+			{
+				inPixel_cur = inPixels[outPixelsR * width];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width] = 0;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width] = temp_sum;
+			}
+			else if (outPixelsC == width - 1)
+			{
+				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
+				outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
+				outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
+				if (outPixel_mid < outPixel_left)
+				{
+					temp = outPixel_mid;
+					trace[(outPixelsR + 1) * width - 1] = 0;
+				}
+				else
+				{
+					temp = outPixel_left;
+					trace[(outPixelsR + 1) * width - 1] = -1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
+			}
+			else
+			{
+				inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
+				outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width + outPixelsC] = 0;
+				}
+				else if (outPixel_left < outPixel_right)
+				{
+					temp = outPixel_left;
+					trace[outPixelsR * width + outPixelsC] = -1;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width + outPixelsC] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width + outPixelsC] = temp_sum;
+			}
+			__syncthreads();
 		}
 	}
-	seam[0] = inPixel_idx;
-	for (int i = 1; i < height; i++)
+}
+
+void findSeam(int * inPixels, int8_t * trace, int width, int height,
+		int * seam)
+{
+	for (int i = 0; i < height; i++)
 	{
-		inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
-		seam[i] = inPixel_idx;
+		if (i == 0)
+		{
+			int inPixel_idx = 0;
+			for (int c = 1; c < width; c++)
+			{
+				if (inPixels[c] < inPixels[inPixel_idx])
+				{
+					inPixel_idx = c;
+				}
+			}
+			seam[i] = inPixel_idx;
+		}
+		else
+		{
+			seam[i] = width + seam[i - 1] + trace[seam[i - 1]];
+		}
+		
 	}
 }
 
-__global__ void findSeamKernel(int *inPixels, int8_t *trace, int width, int height, int *seam)
+__global__ void findSeamKernel(int * inPixels, int8_t * trace, int width, int height, int * seam)
 {
-    int inPixel_idx = 0;
-    int c = blockIdx.x * blockDim.x + threadIdx.x;
-    if (c < width)
-    {
-		if (inPixels[c] < inPixels[inPixel_idx])
-		{
-        	inPixel_idx = c;
-		}
-    }
-	__syncthreads();
-    seam[0] = inPixel_idx;
     int i = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i < height)
-    {
-        inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
-        seam[i] = inPixel_idx;
-    }
+	if (i < height)
+	{
+		if (i == 0)
+		{
+			int inPixel_idx = 0;
+			for (int c = 1; c < width; c++)
+			{
+				if (inPixels[c] < inPixels[inPixel_idx])
+				{
+					inPixel_idx = c;
+				}
+			}
+			seam[i] = inPixel_idx;
+		}
+		else
+		{
+			seam[i] = width + seam[i - 1] + trace[seam[i - 1]];
+		}
+	}
+
 }
 
 
@@ -488,16 +584,7 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 
 __global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int *seam, int width, int height)
 {
-    int i = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i < height)
-    {
-        int j = blockIdx.x * blockDim.x + threadIdx.x;
-        if (j < seam[i])
-        {
-            inPixels_Sobel[i * width + j] = inPixels_Sobel[i * width + j + 1];
-            inPixels[i * width + j] = inPixels[i * width + j + 1];
-        }
-    }
+
 }
 
 
@@ -510,9 +597,19 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		for (i; i > new_width; i--)
 		{
 			computeEnergy(correctOutSobelPixels, i, height, correctSumEnergy);
+			
 			computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
+			// for (int t=0;t<width;t++)
+			// {
+			// 	printf("%i, ", correctSumEnergy[(height - 4) * width + t]);
+			// }
 			findSeam(correctSumEnergy, trace, i, height, correctSeam);
+			// for (int t=0;t<height;t++){printf("%i, ", correctSeam[t]);}
+			// printf("\n");
+			//printf("%i, ", correctSumEnergy[correctSeam[0]]);
+			//for (int t=0;t<300;t++){printf("%i, ", correctSumEnergy[t]);}
 			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
+			//break;
 		}
 	}
 	else
@@ -529,31 +626,49 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		CHECK(cudaMalloc(&d_correctSeam, height * sizeof(int)));
 		CHECK(cudaMalloc(&d_trace, height * width * sizeof(int8_t)));
 
-		CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
+		//CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
+
+		dim3 newBlockSize(blockSize.x * blockSize.y);
+		dim3 newGridSizeX((width - 1) / newBlockSize.x + 1);
+		//dim3 newGridSizeY((height - 1) / newBlockSize.x + 1);
 
 		for (i; i > new_width; i--)
 		{
+			CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * i * sizeof(uint8_t), cudaMemcpyHostToDevice));
 			// computeEnergy(correctOutSobelPixels, i, height, correctSumEnergy);
-			computeEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
+			//computeEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
+			computeEnergyKernel<<<newGridSizeX, newBlockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
+			
 			// CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
 
 
-			computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
-			//computeSumEnergyKernel<<<gridSize, blockSize>>>(correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
-
-
+			// computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
+			//computeSumEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
+			computeSumEnergyKernel<<<newGridSizeX, newBlockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
+			
+			// CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
+			// CHECK(cudaMemcpy(trace, d_trace, height * width * sizeof(int8_t), cudaMemcpyDeviceToHost));
+			CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * i * sizeof(int), cudaMemcpyDeviceToHost));
+			CHECK(cudaMemcpy(trace, d_trace, height * i * sizeof(int8_t), cudaMemcpyDeviceToHost));
+			// for (int t=0;t<width;t++)
+			// {
+			// 	printf("%i, ", correctSumEnergy[(height - 4) * width + t]);
+			// }
 			// CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
 			// CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
 			findSeam(correctSumEnergy, trace, i, height, correctSeam);
 			// findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
 			// CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
-
+			// for (int t=0;t<height;t++){printf("%i, ", correctSeam[t]);}
+			// printf("\n");
+			// printf("%i\n", correctSumEnergy[correctSeam[0]]);
+			// for (int t=0;t<300;t++){printf("%i, ", correctSumEnergy[t]);}
 
 			// CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
 			// CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
 			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
 			// removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
-			
+			//break;
 			
 		}
 		// CHECK(cudaMemcpy(inPixels, d_inPixels, height * width * sizeof(uchar3), cudaMemcpyDeviceToHost));
