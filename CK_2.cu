@@ -575,8 +575,9 @@ __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, in
 			__syncthreads();
 			inPixels_Sobel[seam[i] + c] = t1;
 			inPixels[seam[i] + c] = t2;
-			__syncthreads();
+			
 		}
+		__syncthreads();
 		j++;
 	}
 }
