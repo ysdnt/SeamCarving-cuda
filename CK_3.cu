@@ -369,7 +369,6 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 {
 	// GpuTimer timer;
 	// timer.Start();
-
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
@@ -445,7 +444,7 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 
 __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
 {
-	//
+	extern __shared__ uint8_t s_outPixels[];
 	int outPixelsC = blockIdx.x * blockDim.x + threadIdx.x;
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{
@@ -626,8 +625,8 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		CHECK(cudaMalloc(&d_correctSeam, height * sizeof(int)));
 		CHECK(cudaMalloc(&d_trace, height * width * sizeof(int8_t)));
 
-		//CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
-
+		// CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
+		
 		dim3 newBlockSize(blockSize.x * blockSize.y);
 		dim3 newGridSizeX((width - 1) / newBlockSize.x + 1);
 		//dim3 newGridSizeY((height - 1) / newBlockSize.x + 1);
@@ -644,7 +643,8 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 
 			// computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
 			//computeSumEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
-			computeSumEnergyKernel<<<newGridSizeX, newBlockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
+			size_t kernelBytes = i * sizeof(int);
+			computeSumEnergyKernel<<<newGridSizeX, newBlockSize, kernelBytes>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
 			
 			// CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
 			// CHECK(cudaMemcpy(trace, d_trace, height * width * sizeof(int8_t), cudaMemcpyDeviceToHost));
