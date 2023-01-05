@@ -660,7 +660,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			// for (int t=0;t<300;t++){printf("%i, ", correctSumEnergy[t]);}
 			//printf("\ncorrectSeam\n");
 			CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
-			CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
+			//CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
 			//removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
 			removeSeamKernel<<<newGridSize, newBlockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
 			//break;
