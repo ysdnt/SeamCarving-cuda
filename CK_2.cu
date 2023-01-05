@@ -563,16 +563,20 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
-	int r = blockIdx.y * blockDim.y + threadIdx.y;
-	if (r < height)
+	int length = width * height;
+	int j = 0;
+	for (int i = height - 1; i >= 0; i--)
 	{
-		if (c < width - r - 1)
+		
+		if (c < width - seam[i] - 1 - j)
 		{
-			int i = seam[r];
-			inPixels_Sobel[i] = inPixels_Sobel[i + 1 ];
-			inPixels[i] = inPixels[i + 1 ];
+			uint8_t t1 = inPixels_Sobel[seam[i] + 1 + c];
+			uchar3 t2 = inPixels[seam[i] + 1 + c];
+			inPixels_Sobel[seam[i] + c] = t1;
+			inPixels[seam[i] + c] = t2;
 		}
 		__syncthreads();
+		j++;
 	}
 }
 
