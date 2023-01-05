@@ -200,86 +200,193 @@ void computeEnergy(uint8_t * inPixels, int width, int height,
 	}
 }
 
+// void computeSumEnergy(uint8_t * inPixels, int width, int height,
+// 		int * outPixels, int8_t * trace)
+// {
+// 	// GpuTimer timer;
+// 	// timer.Start();
+// 	// Hàng dưới cùng energy giữ nguyên
+// 	// for (int c = 0; c < width; c++)
+// 	// {
+// 	// 	outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
+// 	// }
+// 	// Mỗi ô ở hàng trên dựa vào 1 trong 3 ô nhỏ nhất ở hàng dưới (trái, giữa, phải)
+// 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
+// 	{	
+// 		// Ô bên trái cùng thì chỉ có 2 ô bên dưới (giữa, phải)
+// 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
+// 		uint8_t inPixel_cur;
+// 		inPixel_cur = inPixels[outPixelsR * width];
+// 		outPixel_mid = outPixels[(outPixelsR + 1) * width];
+// 		outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
+// 		//temp = min(outPixel_mid, outPixel_right);
+// 		if (outPixel_mid < outPixel_right)
+// 		{
+// 			temp = outPixel_mid;
+// 			trace[outPixelsR * width] = 0;
+// 		}
+// 		else
+// 		{
+// 			temp = outPixel_right;
+// 			trace[outPixelsR * width] = 1;
+// 		}
+// 		temp_sum = inPixel_cur + temp;
+// 		outPixels[outPixelsR * width] = temp_sum;
+// 		// Các ô ở giữa dựa vào 3 ô ở hàng dưới (trái, giữa, phải)
+// 		for (int outPixelsC = 1; outPixelsC < width - 1; outPixelsC++)
+// 		{
+// 			inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
+// 			outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
+// 			outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
+// 			outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
+// 			//temp = min(min(outPixel_left, outPixel_mid), outPixel_right);
+// 			if (outPixel_mid < outPixel_right)
+// 			{
+// 				temp = outPixel_mid;
+// 				trace[outPixelsR * width + outPixelsC] = 0;
+// 			}
+// 			else if (outPixel_left < outPixel_right)
+// 			{
+// 				temp = outPixel_left;
+// 				trace[outPixelsR * width + outPixelsC] = -1;
+// 			}
+// 			else
+// 			{
+// 				temp = outPixel_right;
+// 				trace[outPixelsR * width + outPixelsC] = 1;
+// 			}
+// 			temp_sum = inPixel_cur + temp;
+// 			outPixels[outPixelsR * width + outPixelsC] = temp_sum;
+// 		}
+// 		// Ô bên phải cùng thì chỉ có 2 ô bên dưới (trái, giữa)
+// 		inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
+// 		outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
+// 		outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
+// 		//temp = min(outPixel_mid, outPixel_left);
+// 		if (outPixel_mid < outPixel_left)
+// 		{
+// 			temp = outPixel_mid;
+// 			trace[(outPixelsR + 1) * width - 1] = 0;
+// 		}
+// 		else
+// 		{
+// 			temp = outPixel_left;
+// 			trace[(outPixelsR + 1) * width - 1] = -1;
+// 		}
+// 		temp_sum = inPixel_cur + temp;
+// 		outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
+// 	}
+// 	// timer.Stop();
+// 	// float time = timer.Elapsed();
+// 	// printf("Processing time (SumEnergy): %f ms\n\n", time);
+// }
+
 void computeSumEnergy(uint8_t * inPixels, int width, int height,
 		int * outPixels, int8_t * trace)
 {
 	// GpuTimer timer;
 	// timer.Start();
-	// Hàng dưới cùng energy giữ nguyên
-	// for (int c = 0; c < width; c++)
-	// {
-	// 	outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
-	// }
-	// Mỗi ô ở hàng trên dựa vào 1 trong 3 ô nhỏ nhất ở hàng dưới (trái, giữa, phải)
+
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
-	{	
-		// Ô bên trái cùng thì chỉ có 2 ô bên dưới (giữa, phải)
+	{
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
 		uint8_t inPixel_cur;
-		inPixel_cur = inPixels[outPixelsR * width];
-		outPixel_mid = outPixels[(outPixelsR + 1) * width];
-		outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
-		//temp = min(outPixel_mid, outPixel_right);
-		if (outPixel_mid < outPixel_right)
+		for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
 		{
-			temp = outPixel_mid;
-			trace[outPixelsR * width] = 0;
-		}
-		else
-		{
-			temp = outPixel_right;
-			trace[outPixelsR * width] = 1;
-		}
-		temp_sum = inPixel_cur + temp;
-		outPixels[outPixelsR * width] = temp_sum;
-		// Các ô ở giữa dựa vào 3 ô ở hàng dưới (trái, giữa, phải)
-		for (int outPixelsC = 1; outPixelsC < width - 1; outPixelsC++)
-		{
-			inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
-			outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
-			outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
-			outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
-			//temp = min(min(outPixel_left, outPixel_mid), outPixel_right);
-			if (outPixel_mid < outPixel_right)
+			if (outPixelsC == 0)
 			{
-				temp = outPixel_mid;
-				trace[outPixelsR * width + outPixelsC] = 0;
+				inPixel_cur = inPixels[outPixelsR * width];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width] = 0;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width] = temp_sum;
 			}
-			else if (outPixel_left < outPixel_right)
+			else if (outPixelsC == width - 1)
 			{
-				temp = outPixel_left;
-				trace[outPixelsR * width + outPixelsC] = -1;
+				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
+				outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
+				outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
+				if (outPixel_mid < outPixel_left)
+				{
+					temp = outPixel_mid;
+					trace[(outPixelsR + 1) * width - 1] = 0;
+				}
+				else
+				{
+					temp = outPixel_left;
+					trace[(outPixelsR + 1) * width - 1] = -1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
 			}
 			else
 			{
-				temp = outPixel_right;
-				trace[outPixelsR * width + outPixelsC] = 1;
+				inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
+				outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width + outPixelsC] = 0;
+				}
+				else if (outPixel_left < outPixel_right)
+				{
+					temp = outPixel_left;
+					trace[outPixelsR * width + outPixelsC] = -1;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width + outPixelsC] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width + outPixelsC] = temp_sum;
 			}
-			temp_sum = inPixel_cur + temp;
-			outPixels[outPixelsR * width + outPixelsC] = temp_sum;
 		}
-		// Ô bên phải cùng thì chỉ có 2 ô bên dưới (trái, giữa)
-		inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
-		outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
-		outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
-		//temp = min(outPixel_mid, outPixel_left);
-		if (outPixel_mid < outPixel_left)
-		{
-			temp = outPixel_mid;
-			trace[(outPixelsR + 1) * width - 1] = 0;
-		}
-		else
-		{
-			temp = outPixel_left;
-			trace[(outPixelsR + 1) * width - 1] = -1;
-		}
-		temp_sum = inPixel_cur + temp;
-		outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
 	}
 	// timer.Stop();
 	// float time = timer.Elapsed();
 	// printf("Processing time (SumEnergy): %f ms\n\n", time);
 }
+
+// void findSeam(int * inPixels, int8_t * trace, int width, int height,
+// 		int * seam)
+// {
+// 	// GpuTimer timer;
+// 	// timer.Start();
+
+// 	// Tìm vị trí đầu tiên của seam
+// 	int inPixel_idx = 0;
+// 	for (int c = 1; c < width; c++)
+// 	{
+// 		if (inPixels[c] < inPixels[inPixel_idx])
+// 		{
+// 			inPixel_idx = c;
+// 		}
+// 	}
+// 	seam[0] = inPixel_idx;
+// 	// Tìm seam dựa theo vết đã lưu
+// 	for (int i = 1; i < height; i++)
+// 	{
+// 		inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
+// 		seam[i] = inPixel_idx;
+// 	}
+
+// 	// timer.Stop();
+// 	// float time = timer.Elapsed();
+// 	// printf("Processing time (Seam): %f ms\n\n", time);
+// }
 
 void findSeam(int * inPixels, int8_t * trace, int width, int height,
 		int * seam)
@@ -287,21 +394,25 @@ void findSeam(int * inPixels, int8_t * trace, int width, int height,
 	// GpuTimer timer;
 	// timer.Start();
 
-	// Tìm vị trí đầu tiên của seam
-	int inPixel_idx = 0;
-	for (int c = 1; c < width; c++)
+	for (int i = 0; i < height; i++)
 	{
-		if (inPixels[c] < inPixels[inPixel_idx])
+		if (i == 0)
 		{
-			inPixel_idx = c;
+			int inPixel_idx = 0;
+			for (int c = 1; c < width; c++)
+			{
+				if (inPixels[c] < inPixels[inPixel_idx])
+				{
+					inPixel_idx = c;
+				}
+			}
+			seam[i] = inPixel_idx;
 		}
-	}
-	seam[0] = inPixel_idx;
-	// Tìm seam dựa theo vết đã lưu
-	for (int i = 1; i < height; i++)
-	{
-		inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
-		seam[i] = inPixel_idx;
+		else
+		{
+			seam[i] = width + seam[i - 1] + trace[seam[i - 1]];
+		}
+		
 	}
 
 	// timer.Stop();
