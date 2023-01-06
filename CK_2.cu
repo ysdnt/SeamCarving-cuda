@@ -539,7 +539,7 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	}
 }
 
-
+__device__ int bCount = 0;
 __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
 	__shared__ int bi;
