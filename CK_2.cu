@@ -193,7 +193,7 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 		uchar3 * d_inPixels;
 		uint8_t * d_outPixels;
 		size_t nBytes = 3 * width * height * sizeof(uint8_t);
-		CHECK(cudaMalloc(&d_inPixels, 3 * width * height * sizeof(uchar3)));
+		CHECK(cudaMalloc(&d_inPixels, width * height * sizeof(uchar3)));
 		CHECK(cudaMalloc(&d_outPixels, nBytes));
 		CHECK(cudaMemcpy(d_inPixels, inPixels, nBytes, cudaMemcpyHostToDevice));
 		dim3 gridSize((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
