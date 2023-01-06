@@ -602,8 +602,15 @@ __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, in
 									uchar3 * inPixels_temp, uint8_t * inPixels_Sobel_temp,
 									int width, int height)
 {
+	extern __shared__ int s_seam[];
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
-	if (c < seam[0])
+	if (c < height)
+	{
+		s_seam[c] = seam[c];
+	}
+	__syncthreads();
+
+	if (c < s_seam[0])
 	{
 		inPixels_Sobel_temp[c] = inPixels_Sobel[c];
 		inPixels_temp[c] = inPixels[c];
@@ -615,25 +622,25 @@ __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, in
 	uchar3 t_in;
 	for (int i = 1; i < height; i++)
 	{
-		t_inS = inPixels_Sobel[seam[i - 1] + 1 + c];
-	 	t_in = inPixels[seam[i - 1] + 1 + c];
+		t_inS = inPixels_Sobel[s_seam[i - 1] + 1 + c];
+	 	t_in = inPixels[s_seam[i - 1] + 1 + c];
 	 	__syncthreads();
-		if (seam[i - 1] + 1 + c < seam[i])
+		if (s_seam[i - 1] + 1 + c < s_seam[i])
 		{
-			inPixels_Sobel_temp[seam[i - 1] + 1 + c - j] = t_inS;
-			inPixels_temp[seam[i - 1] + 1 + c - j] = t_in;
+			inPixels_Sobel_temp[s_seam[i - 1] + 1 + c - j] = t_inS;
+			inPixels_temp[s_seam[i - 1] + 1 + c - j] = t_in;
 		}
 		__syncthreads();
 		j++;
 	}
 
 	int length = width * height;
-	t_inS = inPixels_Sobel[seam[height - 1] + 1 + c];
-	t_in = inPixels[seam[height - 1] + 1 + c];
-	if (seam[height - 1] + 1 + c < length)
+	t_inS = inPixels_Sobel[s_seam[height - 1] + 1 + c];
+	t_in = inPixels[s_seam[height - 1] + 1 + c];
+	if (s_seam[height - 1] + 1 + c < length)
 	{
-		inPixels_Sobel_temp[seam[height - 1] + 1 + c - j] = t_inS;
-		inPixels_temp[seam[height - 1] + 1 + c - j] = t_in;
+		inPixels_Sobel_temp[s_seam[height - 1] + 1 + c - j] = t_inS;
+		inPixels_temp[s_seam[height - 1] + 1 + c - j] = t_in;
 	}
 }
 
@@ -694,7 +701,8 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			findSeam(correctSumEnergy, trace, i, height, correctSeam);
 			CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
 			
-			removeSeamKernel<<<newGridSizeX, newBlockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, d_inPixels_temp, d_correctOutSobelPixels_temp, i, height);
+			kernelBytes = height * sizeof(int);
+			removeSeamKernel<<<newGridSizeX, newBlockSize, kernelBytes>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, d_inPixels_temp, d_correctOutSobelPixels_temp, i, height);
 			errSync  = cudaGetLastError();
 			errAsync = cudaDeviceSynchronize();
 			if (errSync != cudaSuccess) 
