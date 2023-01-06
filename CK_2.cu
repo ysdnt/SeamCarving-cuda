@@ -532,7 +532,6 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	}
 }
 
-
 __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam,
 									uchar3 * inPixels_temp, uint8_t * inPixels_Sobel_temp,
 									int width, int height)
