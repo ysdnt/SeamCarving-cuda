@@ -377,6 +377,7 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 			}
 			else if (outPixelsC == width - 1)
 			{
+				//inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
 				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
 				outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
 				outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
@@ -524,30 +525,7 @@ void findSeam(int * inPixels, int8_t * trace, int width, int height,
 	}
 }
 
-// __global__ void findSeamKernel(int * inPixels, int8_t * trace, int width, int height, int * seam)
-// {
-//     int i = blockIdx.y * blockDim.y + threadIdx.y;
-// 	if (i < height)
-// 	{
-// 		if (i == 0)
-// 		{
-// 			int inPixel_idx = 0;
-// 			for (int c = 1; c < width; c++)
-// 			{
-// 				if (inPixels[c] < inPixels[inPixel_idx])
-// 				{
-// 					inPixel_idx = c;
-// 				}
-// 			}
-// 			seam[i] = inPixel_idx;
-// 		}
-// 		else
-// 		{
-// 			seam[i] = width + seam[i - 1] + trace[seam[i - 1]];
-// 		}
-// 	}
 
-// }
 void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
 
@@ -564,61 +542,33 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 
 __global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
-	// // Calculate the index of the current thread
-    // int idx = blockIdx.x * blockDim.x + threadIdx.x;
-
-    // // Check if the thread is within the bounds of the image
-    // if (idx < width * height)
-    // {
-    //     // Calculate the row and column indices for the current thread
-    //     int row = idx / width;
-    //     int col = idx % width;
-
-    //     // Check if the current thread is to the right of the seam
-    //     if (col > seam[row])
-    //     {
-    //         // Shift the data to the left by copying the data from the right of the seam to the location of the seam
-    //         inPixels_Sobel[idx] = inPixels_Sobel[idx + 1];
-    //         inPixels[idx] = inPixels[idx + 1];
-    //     }
-    // }
-
-	// Calculate the row and column indices for the current thread
-    int row = blockIdx.y;
-    int col = threadIdx.x;
-
-    // Calculate the index of the current thread
-    int idx = row * width + col;
-
-    // Check if the current thread is within the bounds of the image
-    if (row < height && col < width)
+	__shared__ int bi;
+    if (threadIdx.x == 0)
     {
-        // Check if the current thread is to the right of the seam
-        if (col > seam[row])
-        {
-            // Shift the data to the left by copying the data from the right of the seam to the location of the seam
-            inPixels_Sobel[idx] = inPixels_Sobel[idx + 1];
-            inPixels[idx] = inPixels[idx + 1];
-        }
+        bi = atomicAdd(&bCount, 1);
     }
+    __syncthreads();
 
-	// int c = blockIdx.x * blockDim.x + threadIdx.x;
-	// int length = width * height;
-	// int j = 0;
-	// for (int i = height - 1; i >= 0; i--)
-	// {
-	// 	uint8_t t1 = inPixels_Sobel[seam[i] + 1 + c];
-	// 	uchar3 t2 = inPixels[seam[i] + 1 + c];
-	// 	if (c < length - s_seam[i] - 1 - j)
-	// 	{
+	int c = bi * blockDim.x + threadIdx.x;
+	int length = width * height;
+	int j = 0;
+
+	for (int i = 0; i < height; i++)
+	{
+		uint8_t t1 = inPixels_Sobel[c - j];
+		uchar3 t2 = inPixels[c - j];
+		//__threadfence();
+		__syncthreads();
+		if (c > seam[i])
+		{
 			
-	// 		inPixels_Sobel[seam[i] + c] = t1;
-	// 		inPixels[seam[i] + c] = t2;
-	// 	}
+			inPixels_Sobel[c - j - 1] = t1;
+			inPixels[c - j - 1] = t2;
+		}
 		
-	// 	__syncthreads();
-	// 	j++;
-	// }
+		__syncthreads();
+		j++;
+	}
 	
 }
 
@@ -666,7 +616,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		dim3 newBlockSize(blockSize.x * blockSize.y);
 		dim3 newGridSizeX((width - 1) / newBlockSize.x + 1);
 		dim3 newGridSize((width * height - 1) / newBlockSize.x + 1);
-		dim3 GridSizeNew(width, height);
+
 
 		for (i; i > new_width; i--)
 		{
@@ -706,7 +656,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			//CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
 			//removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
 			//size_t kernelBytes = height * sizeof(int);
-			removeSeamKernel<<<GridSizeNew, 1>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
+			removeSeamKernel<<<newGridSize, newBlockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
 			// i--;
 			// break;
 			
