@@ -63,7 +63,7 @@ void readPnm(char * fileName,
 	char type[3];
 	fscanf(f, "%s", type);
 	
-	if (strcmp(type, "P3") != 0) // In this exercise, we don't touch other types
+	if (strcmp(type, "P3") != 0)
 	{
 		fclose(f);
 		printf("Cannot read %s\n", fileName); 
@@ -75,7 +75,7 @@ void readPnm(char * fileName,
 	
 	int max_val;
 	fscanf(f, "%i", &max_val);
-	if (max_val > 255) // In this exercise, we assume 1 byte per value
+	if (max_val > 255)
 	{
 		fclose(f);
 		printf("Cannot read %s\n", fileName); 
@@ -153,7 +153,8 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
-	printf("Processing time (Rgb2Gray): %f ms\n\n", time);
+	printf("Processing time (convertRgb2Gray) (%s): %f ms\n\n", 
+		 "use device" , time);
 }
 
 void convertGray2Sobel(uint8_t * inPixels, int width, int height,
@@ -188,7 +189,8 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
-	printf("Processing time (Gray2Sobel): %f ms\n\n", time);
+	printf("Processing time (convertGray2Sobel) (%s): %f ms\n\n", 
+		 "use device" , time);
 }
 
 void computeEnergy(uint8_t * inPixels, int width, int height,
@@ -200,93 +202,9 @@ void computeEnergy(uint8_t * inPixels, int width, int height,
 	}
 }
 
-// void computeSumEnergy(uint8_t * inPixels, int width, int height,
-// 		int * outPixels, int8_t * trace)
-// {
-// 	// GpuTimer timer;
-// 	// timer.Start();
-// 	// Hàng dưới cùng energy giữ nguyên
-// 	// for (int c = 0; c < width; c++)
-// 	// {
-// 	// 	outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
-// 	// }
-// 	// Mỗi ô ở hàng trên dựa vào 1 trong 3 ô nhỏ nhất ở hàng dưới (trái, giữa, phải)
-// 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
-// 	{	
-// 		// Ô bên trái cùng thì chỉ có 2 ô bên dưới (giữa, phải)
-// 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
-// 		uint8_t inPixel_cur;
-// 		inPixel_cur = inPixels[outPixelsR * width];
-// 		outPixel_mid = outPixels[(outPixelsR + 1) * width];
-// 		outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
-// 		//temp = min(outPixel_mid, outPixel_right);
-// 		if (outPixel_mid < outPixel_right)
-// 		{
-// 			temp = outPixel_mid;
-// 			trace[outPixelsR * width] = 0;
-// 		}
-// 		else
-// 		{
-// 			temp = outPixel_right;
-// 			trace[outPixelsR * width] = 1;
-// 		}
-// 		temp_sum = inPixel_cur + temp;
-// 		outPixels[outPixelsR * width] = temp_sum;
-// 		// Các ô ở giữa dựa vào 3 ô ở hàng dưới (trái, giữa, phải)
-// 		for (int outPixelsC = 1; outPixelsC < width - 1; outPixelsC++)
-// 		{
-// 			inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
-// 			outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
-// 			outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
-// 			outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
-// 			//temp = min(min(outPixel_left, outPixel_mid), outPixel_right);
-// 			if (outPixel_mid < outPixel_right)
-// 			{
-// 				temp = outPixel_mid;
-// 				trace[outPixelsR * width + outPixelsC] = 0;
-// 			}
-// 			else if (outPixel_left < outPixel_right)
-// 			{
-// 				temp = outPixel_left;
-// 				trace[outPixelsR * width + outPixelsC] = -1;
-// 			}
-// 			else
-// 			{
-// 				temp = outPixel_right;
-// 				trace[outPixelsR * width + outPixelsC] = 1;
-// 			}
-// 			temp_sum = inPixel_cur + temp;
-// 			outPixels[outPixelsR * width + outPixelsC] = temp_sum;
-// 		}
-// 		// Ô bên phải cùng thì chỉ có 2 ô bên dưới (trái, giữa)
-// 		inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
-// 		outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
-// 		outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
-// 		//temp = min(outPixel_mid, outPixel_left);
-// 		if (outPixel_mid < outPixel_left)
-// 		{
-// 			temp = outPixel_mid;
-// 			trace[(outPixelsR + 1) * width - 1] = 0;
-// 		}
-// 		else
-// 		{
-// 			temp = outPixel_left;
-// 			trace[(outPixelsR + 1) * width - 1] = -1;
-// 		}
-// 		temp_sum = inPixel_cur + temp;
-// 		outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
-// 	}
-// 	// timer.Stop();
-// 	// float time = timer.Elapsed();
-// 	// printf("Processing time (SumEnergy): %f ms\n\n", time);
-// }
-
 void computeSumEnergy(uint8_t * inPixels, int width, int height,
 		int * outPixels, int8_t * trace)
 {
-	// GpuTimer timer;
-	// timer.Start();
-
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
@@ -355,45 +273,11 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 			}
 		}
 	}
-	// timer.Stop();
-	// float time = timer.Elapsed();
-	// printf("Processing time (SumEnergy): %f ms\n\n", time);
 }
-
-// void findSeam(int * inPixels, int8_t * trace, int width, int height,
-// 		int * seam)
-// {
-// 	// GpuTimer timer;
-// 	// timer.Start();
-
-// 	// Tìm vị trí đầu tiên của seam
-// 	int inPixel_idx = 0;
-// 	for (int c = 1; c < width; c++)
-// 	{
-// 		if (inPixels[c] < inPixels[inPixel_idx])
-// 		{
-// 			inPixel_idx = c;
-// 		}
-// 	}
-// 	seam[0] = inPixel_idx;
-// 	// Tìm seam dựa theo vết đã lưu
-// 	for (int i = 1; i < height; i++)
-// 	{
-// 		inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
-// 		seam[i] = inPixel_idx;
-// 	}
-
-// 	// timer.Stop();
-// 	// float time = timer.Elapsed();
-// 	// printf("Processing time (Seam): %f ms\n\n", time);
-// }
 
 void findSeam(int * inPixels, int8_t * trace, int width, int height,
 		int * seam)
 {
-	// GpuTimer timer;
-	// timer.Start();
-
 	for (int i = 0; i < height; i++)
 	{
 		if (i == 0)
@@ -414,44 +298,19 @@ void findSeam(int * inPixels, int8_t * trace, int width, int height,
 		}
 		
 	}
-
-	// timer.Stop();
-	// float time = timer.Elapsed();
-	// printf("Processing time (Seam): %f ms\n\n", time);
 }
 
 void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
-	// GpuTimer timer;
-	// timer.Start();
-
 	int length = width * height;
-	// Đi từ pixel dưới cùng của seam
 	for (int i = height - 1; i >= 0; i--)
 	{
 		int j = 0;
-		// Dịch chuyển các pixels bên phải vị trí pixel seam qua bên trái 1 pixel 
-		// ở ảnh energy và ảnh màu
 		memcpy(&inPixels_Sobel[seam[i]], &inPixels_Sobel[seam[i] + 1], length - seam[i] - 1 - j);
 		memcpy(&inPixels[seam[i]], &inPixels[seam[i] + 1], (length - seam[i] - 1 - j) * sizeof(uchar3));
 		j++;
 	}
-
-	// timer.Stop();
-	// float time = timer.Elapsed();
-	// printf("Processing time (removeSeam): %f ms\n\n", time);
 }
-
-
-
-// float computeError(uint8_t * a1, uint8_t * a2, int n)
-// {
-// 	float err = 0;
-// 	for (int i = 0; i < n; i++)
-// 		err += abs((int)a1[i] - (int)a2[i]);
-// 	err /= n;
-// 	return err;
-// }
 
 char * concatStr(const char * s1, const char * s2)
 {
@@ -461,13 +320,29 @@ char * concatStr(const char * s1, const char * s2)
 	return result;
 }
 
+void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int * correctSumEnergy, int * correctSeam, int8_t * trace, uchar3 * inPixels, int width, int height)
+{
+	GpuTimer timer;
+	timer.Start();
+	for (i; i > new_width; i--)
+	{
+		computeEnergy(correctOutSobelPixels, i, height, correctSumEnergy);
+		computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
+		findSeam(correctSumEnergy, trace, i, height, correctSeam);
+		removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
+	}
+	timer.Stop();
+	float time = timer.Elapsed();
+	printf("Processing time (find2removeSeam) (%s): %f ms\n\n", 
+		 "use device" , time);
+}
 int main(int argc, char ** argv)
 {	
-	// if (argc != 3 && argc != 5)
-	// {
-	// 	printf("The number of arguments is invalid\n");
-	// 	return EXIT_FAILURE;
-	// }
+	if (argc != 3 && argc != 4)
+	{
+		printf("The number of arguments is invalid\n");
+		return EXIT_FAILURE;
+	}
 
 	// Read input image file
 	int width, height;
@@ -487,7 +362,6 @@ int main(int argc, char ** argv)
 	x_Sobel[3] = y_Sobel[1] = 2;
 	x_Sobel[5] = y_Sobel[7] = -2;
 
-	
 	// Convert RGB to grayscale
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
 	convertRgb2Gray(inPixels, width, height, correctOutPixels);
@@ -498,33 +372,19 @@ int main(int argc, char ** argv)
 	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
 	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
 
-	// New width
-	int new_width = 2 * width / 3;
-
-	int * correctSumEnergy = (int *)malloc(width * height * sizeof(int));
-	int8_t * trace = (int8_t *)malloc(width * height);
-	int * correctSeam = (int *)malloc(height * sizeof(int));
-
-	GpuTimer timer;
-	timer.Start();
-	for (width; width > new_width; width--)
+	int new_width = 2 * width / 3; //Default
+	if (argc == 4)
 	{
-		// Sum energy from bottom to top
-		computeEnergy(correctOutSobelPixels, width, height, correctSumEnergy);
-		computeSumEnergy(correctOutSobelPixels, width, height, correctSumEnergy, trace);
+		new_width = atoi(argv[3]);
+	}  
+	int i = width;
 
-		// Find seam with the least energy
-		findSeam(correctSumEnergy, trace, width, height, correctSeam);
-
-		// Remove that seam
-		removeSeam(inPixels, correctOutSobelPixels, correctSeam, width, height);
-	}
-	timer.Stop();
-	float time = timer.Elapsed();
-	printf("Processing time (SeamCarving): %f ms\n\n", time);
-
-	// Image after seam carving
-	writePnm(inPixels, width, height, concatStr(outFileNameBase, "_host.pnm"));
+	// Find and remove seam using host
+	int * correctSumEnergy = (int *)malloc(width * height * sizeof(int));
+	int8_t * trace = (int8_t *)malloc(width * height * sizeof(int8_t));
+	int * correctSeam = (int *)malloc(height * sizeof(int));
+	find2removeSeam(new_width, i, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
+	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_seam_host.pnm"));
 
 	// Free memories
 	free(inPixels);
