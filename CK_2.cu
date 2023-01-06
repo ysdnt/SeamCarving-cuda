@@ -637,7 +637,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 
 int main(int argc, char ** argv)
 {	
-	if (argc != 3 && argc != 4)
+	if (argc != 3 && argc != 4 && argc != 6)
 	{
 		printf("The number of arguments is invalid\n");
 		return EXIT_FAILURE;
@@ -670,6 +670,11 @@ int main(int argc, char ** argv)
 	// Convert RGB to grayscale using device
 	uint8_t * outPixels= (uint8_t *)malloc(width * height);
 	dim3 blockSize(32, 32); // Default
+	if (argc == 6)
+	{
+		blockSize.x = atoi(argv[4]);
+		blockSize.y = atoi(argv[5]);
+	}  
 	convertRgb2Gray(inPixelsDevice, width, height, outPixels, true, blockSize);
 	writePnm(outPixels, width, height, concatStr(outFileNameBase, "_ck2_gray_device.pnm"));
 
@@ -684,7 +689,7 @@ int main(int argc, char ** argv)
 	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_ck2_sobel_device.pnm"));
 
 	int new_width = 2 * width / 3; //Default
-	if (argc == 4)
+	if (argc == 4 || argc == 6)
 	{
 		new_width = atoi(argv[3]);
 	}  
