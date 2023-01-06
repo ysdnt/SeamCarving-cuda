@@ -365,12 +365,12 @@ int main(int argc, char ** argv)
 	// Convert RGB to grayscale
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
 	convertRgb2Gray(inPixels, width, height, correctOutPixels);
-	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
+	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "ck1_gray_host.pnm"));
 
 	// Convert grayscale to sobel-grayscale (energy)
 	uint8_t * correctOutSobelPixels= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
-	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
+	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "ck1_sobel_host.pnm"));
 
 	int new_width = 2 * width / 3; //Default
 	if (argc == 4)
@@ -384,7 +384,7 @@ int main(int argc, char ** argv)
 	int8_t * trace = (int8_t *)malloc(width * height * sizeof(int8_t));
 	int * correctSeam = (int *)malloc(height * sizeof(int));
 	find2removeSeam(new_width, i, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
-	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_seam_host.pnm"));
+	writePnm(inPixels, i, height, concatStr(outFileNameBase, "ck1_seam_host.pnm"));
 
 	// Free memories
 	free(inPixels);
