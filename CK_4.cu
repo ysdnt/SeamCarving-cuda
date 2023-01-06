@@ -156,15 +156,21 @@ float computeError(uint8_t * a1, uint8_t * a2, int n)
 __global__ void convertRgb2GrayKernel(uchar3 * inPixels, int width, int height, 
 		uint8_t * outPixels)
 {  
+	extern __shared__ uchar3 s_in[];
 	int r = blockIdx.y * blockDim.y + threadIdx.y;
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
 	if(r < height && c < width)
 	{
 		int i = r * width + c;
-		uint8_t red = inPixels[i].x;
-		uint8_t green = inPixels[i].y;
-		uint8_t blue = inPixels[i].z;
-		outPixels[i] = 0.299f * red + 0.587f * green + 0.114f * blue;
+		s_in[threadIdx.y * blockDim.x + threadIdx.x] = inPixels[i];
+		__syncthreads();
+		if(threadIdx.y < blockDim.y && threadIdx.x < blockDim.x)
+        {
+            uint8_t red = s_in[threadIdx.y * blockDim.x + threadIdx.x].x;
+            uint8_t green = s_in[threadIdx.y * blockDim.x + threadIdx.x].y;
+            uint8_t blue = s_in[threadIdx.y * blockDim.x + threadIdx.x].z;
+            outPixels[i] = (red + 2 * green + blue) >> 2;
+        }
 	}
 
 }
@@ -189,32 +195,24 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
             }
         }
 	}
-	else // use device
+	else 
 	{
-		// TODO: Allocate device memories
 		uchar3 * d_inPixels;
 		uint8_t * d_outPixels;
-		size_t nBytes = width * height * sizeof(uint8_t);
+		size_t nBytes = 3 * width * height * sizeof(uint8_t);
 		CHECK(cudaMalloc(&d_inPixels, width * height * sizeof(uchar3)));
 		CHECK(cudaMalloc(&d_outPixels, nBytes));
-
-		// TODO: Copy data to device memories
 		CHECK(cudaMemcpy(d_inPixels, inPixels, width * height * sizeof(uchar3), cudaMemcpyHostToDevice));
-
-		// TODO: Set grid size and call kernel (remember to check kernel error)
 		dim3 gridSize((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
-		convertRgb2GrayKernel<<<gridSize, blockSize>>>(d_inPixels, width, height, d_outPixels);
-
+		size_t kernelBytes = (blockSize.x) * (blockSize.y) * sizeof(uchar3);
+		convertRgb2GrayKernel<<<gridSize, blockSize, kernelBytes>>>(d_inPixels, width, height, d_outPixels);
 		cudaError_t errSync  = cudaGetLastError();
 		cudaError_t errAsync = cudaDeviceSynchronize();
 		if (errSync != cudaSuccess) 
 			printf("Sync kernel error: %s\n", cudaGetErrorString(errSync));
 		if (errAsync != cudaSuccess)
 			printf("Async kernel error: %s\n", cudaGetErrorString(errAsync));
-		// TODO: Copy result from device memories
 		CHECK(cudaMemcpy(outPixels, d_outPixels, nBytes, cudaMemcpyDeviceToHost));
-
-		// TODO: Free device memories
 		CHECK(cudaFree(d_inPixels));
 		CHECK(cudaFree(d_outPixels));
 
@@ -306,17 +304,12 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 	}
 	else
 	{
-		// TODO
 		uint8_t * d_inPixels;
 		uint8_t * d_outPixels;
-		// int8_t * d_x_Sobel;
-		// int8_t * d_y_Sobel;
 		size_t nBytes = height * width * sizeof(uint8_t);
 		size_t nBytesFilter = filterWidth * filterWidth * sizeof(int8_t);
 		CHECK(cudaMalloc(&d_inPixels, nBytes));
 		CHECK(cudaMalloc(&d_outPixels, nBytes));
-		//CHECK(cudaMalloc(&d_x_Sobel, nBytesFilter));
-		//CHECK(cudaMalloc(&d_y_Sobel, nBytesFilter));
 		CHECK(cudaMemcpy(d_inPixels, inPixels, nBytes, cudaMemcpyHostToDevice));
 		CHECK(cudaMemcpyToSymbol(dc_x_Sobel, x_Sobel, nBytesFilter));
 		CHECK(cudaMemcpyToSymbol(dc_y_Sobel, y_Sobel, nBytesFilter));
@@ -333,8 +326,6 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 		CHECK(cudaMemcpy(outPixels, d_outPixels, nBytes, cudaMemcpyDeviceToHost));
 		CHECK(cudaFree(d_inPixels));
         CHECK(cudaFree(d_outPixels));
-        // CHECK(cudaFree(d_x_Sobel));
-		// CHECK(cudaFree(d_y_Sobel));
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
@@ -343,7 +334,6 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 			useDevice == true? "use device" : "use host", time);
 }
 
-//in: inPixels				//out: outPixels, trace
 void computeEnergy(uint8_t * inPixels, int width, int height, int * outPixels)
 {
 	for (int c = 0; c < width; c++)
@@ -353,125 +343,231 @@ void computeEnergy(uint8_t * inPixels, int width, int height, int * outPixels)
 }
 __global__ void computeEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels)
 {
+	extern __shared__ int s_out[];
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx < width)
+	{
+		s_out[idx] = inPixels[(height - 1) * width + idx];
+	}
+	__syncthreads();
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
 	if (c < width)
 	{
-		outPixels[(height - 1) * width + c] = inPixels[(height - 1) * width + c];
+		outPixels[(height - 1) * width + c] = s_out[c];
 	}
 }
 
-void computeSumEnergy(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
+void computeSumEnergy(uint8_t * inPixels, int width, int height,
+		int * outPixels, int8_t * trace)
 {
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
-	{	
+	{
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
 		uint8_t inPixel_cur;
-		inPixel_cur = inPixels[outPixelsR * width];
-		outPixel_mid = outPixels[(outPixelsR + 1) * width];
-		outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
-		if (outPixel_mid < outPixel_right)
+		for (int outPixelsC = 0; outPixelsC < width; outPixelsC++)
 		{
-			temp = outPixel_mid;
-			trace[outPixelsR * width] = 0;
-		}
-		else
-		{
-			temp = outPixel_right;
-			trace[outPixelsR * width] = 1;
-		}
-		temp_sum = inPixel_cur + temp;
-		outPixels[outPixelsR * width] = temp_sum;
-		for (int outPixelsC = 1; outPixelsC < width - 1; outPixelsC++)
-		{
-			inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
-			outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
-			outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
-			outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
-			if (outPixel_mid < outPixel_right)
+			if (outPixelsC == 0)
 			{
-				temp = outPixel_mid;
-				trace[outPixelsR * width + outPixelsC] = 0;
+				inPixel_cur = inPixels[outPixelsR * width];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width] = 0;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width] = temp_sum;
 			}
-			else if (outPixel_left < outPixel_right)
+			else if (outPixelsC == width - 1)
 			{
-				temp = outPixel_left;
-				trace[outPixelsR * width + outPixelsC] = -1;
+				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
+				outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
+				outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
+				if (outPixel_mid < outPixel_left)
+				{
+					temp = outPixel_mid;
+					trace[(outPixelsR + 1) * width - 1] = 0;
+				}
+				else
+				{
+					temp = outPixel_left;
+					trace[(outPixelsR + 1) * width - 1] = -1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
 			}
 			else
 			{
-				temp = outPixel_right;
-				trace[outPixelsR * width + outPixelsC] = 1;
+				inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
+				outPixel_left = outPixels[(outPixelsR + 1) * width + outPixelsC - 1];
+				outPixel_mid = outPixels[(outPixelsR + 1) * width + outPixelsC];
+				outPixel_right = outPixels[(outPixelsR + 1) * width + outPixelsC + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width + outPixelsC] = 0;
+				}
+				else if (outPixel_left < outPixel_right)
+				{
+					temp = outPixel_left;
+					trace[outPixelsR * width + outPixelsC] = -1;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width + outPixelsC] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width + outPixelsC] = temp_sum;
 			}
-			temp_sum = inPixel_cur + temp;
-			outPixels[outPixelsR * width + outPixelsC] = temp_sum;
 		}
-		inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
-		outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
-		outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
-		if (outPixel_mid < outPixel_left)
-		{
-			temp = outPixel_mid;
-			trace[(outPixelsR + 1) * width - 1] = 0;
-		}
-		else
-		{
-			temp = outPixel_left;
-			trace[(outPixelsR + 1) * width - 1] = -1;
-		}
-		temp_sum = inPixel_cur + temp;
-		outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
 	}
 }
 
 __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
 {
-	//
-}
-
-void findSeam(int * inPixels, int8_t * trace, int width, int height, int * seam)
-{
-
-	int inPixel_idx = 0;
-	for (int c = 1; c < width; c++)
+	extern __shared__ int s_outPixels[];
+	int outPixelsC = blockIdx.x * blockDim.x + threadIdx.x;
+	if (outPixelsC < width)
 	{
-		if (inPixels[c] < inPixels[inPixel_idx])
+		s_outPixels[width + outPixelsC] = outPixels[(height - 1) * width + outPixelsC];
+	}
+
+	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
+	{
+		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
+		uint8_t inPixel_cur;
+		if (outPixelsC < width)
 		{
-			inPixel_idx = c;
+			if (outPixelsC == 0)
+			{
+				inPixel_cur = inPixels[outPixelsR * width];
+				outPixel_mid = s_outPixels[width + outPixelsC];
+				outPixel_right = s_outPixels[width + outPixelsC + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width] = 0;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width] = temp_sum;
+				s_outPixels[outPixelsC] = temp_sum;
+			}
+			else if (outPixelsC == width - 1)
+			{
+				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
+				outPixel_mid = s_outPixels[width + outPixelsC];
+				outPixel_left = s_outPixels[width + outPixelsC - 1];
+				if (outPixel_mid < outPixel_left)
+				{
+					temp = outPixel_mid;
+					trace[(outPixelsR + 1) * width - 1] = 0;
+				}
+				else
+				{
+					temp = outPixel_left;
+					trace[(outPixelsR + 1) * width - 1] = -1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[(outPixelsR + 1) * width - 1] = temp_sum;
+				s_outPixels[outPixelsC] = temp_sum;
+			}
+			else
+			{
+				inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
+				outPixel_left = s_outPixels[width + outPixelsC - 1];
+				outPixel_mid = s_outPixels[width + outPixelsC];
+				outPixel_right = s_outPixels[width + outPixelsC + 1];
+				if (outPixel_mid < outPixel_right)
+				{
+					temp = outPixel_mid;
+					trace[outPixelsR * width + outPixelsC] = 0;
+				}
+				else if (outPixel_left < outPixel_right)
+				{
+					temp = outPixel_left;
+					trace[outPixelsR * width + outPixelsC] = -1;
+				}
+				else
+				{
+					temp = outPixel_right;
+					trace[outPixelsR * width + outPixelsC] = 1;
+				}
+				temp_sum = inPixel_cur + temp;
+				outPixels[outPixelsR * width + outPixelsC] = temp_sum;
+				s_outPixels[outPixelsC] = temp_sum;
+			}
+			__syncthreads();
+			s_outPixels[width + outPixelsC] = s_outPixels[outPixelsC];
+			__syncthreads();
 		}
 	}
-	seam[0] = inPixel_idx;
-	for (int i = 1; i < height; i++)
+}
+
+void findSeam(int * inPixels, int8_t * trace, int width, int height,
+		int * seam)
+{
+	for (int i = 0; i < height; i++)
 	{
-		inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
-		seam[i] = inPixel_idx;
+		if (i == 0)
+		{
+			int inPixel_idx = 0;
+			for (int c = 1; c < width; c++)
+			{
+				if (inPixels[c] < inPixels[inPixel_idx])
+				{
+					inPixel_idx = c;
+				}
+			}
+			seam[i] = inPixel_idx;
+		}
+		else
+		{
+			seam[i] = width + seam[i - 1] + trace[seam[i - 1]];
+		}
+		
 	}
 }
 
-__global__ void findSeamKernel(int *inPixels, int8_t *trace, int width, int height, int *seam)
+__global__ void findSeamKernel(int * inPixels, int8_t * trace, int width, int height, int * seam)
 {
-    int inPixel_idx = 0;
-    int c = blockIdx.x * blockDim.x + threadIdx.x;
-    if (c < width)
-    {
-		if (inPixels[c] < inPixels[inPixel_idx])
-		{
-        	inPixel_idx = c;
-		}
-    }
-	__syncthreads();
-    seam[0] = inPixel_idx;
     int i = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i < height)
-    {
-        inPixel_idx = width + seam[i - 1] + trace[seam[i - 1]];
-        seam[i] = inPixel_idx;
-    }
+	if (i < height)
+	{
+		if (i == 0)
+		{
+			int inPixel_idx = 0;
+			for (int c = 1; c < width; c++)
+			{
+				if (inPixels[c] < inPixels[inPixel_idx])
+				{
+					inPixel_idx = c;
+				}
+			}
+			seam[i] = inPixel_idx;
+		}
+		else
+		{
+			seam[i] = width + seam[i - 1] + trace[seam[i - 1]];
+		}
+	}
+
 }
 
 
 void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int width, int height)
 {
-
 	int length = width * height;
 	for (int i = height - 1; i >= 0; i--)
 	{
@@ -482,18 +578,41 @@ void removeSeam(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam, int wid
 	}
 }
 
-__global__ void removeSeamKernel(uchar3 *inPixels, uint8_t *inPixels_Sobel, int *seam, int width, int height)
+__global__ void removeSeamKernel(uchar3 * inPixels, uint8_t * inPixels_Sobel, int * seam,
+									uchar3 * inPixels_temp, uint8_t * inPixels_Sobel_temp,
+									int width, int height)
 {
-    int i = blockIdx.y * blockDim.y + threadIdx.y;
-    if (i < height)
-    {
-        int j = blockIdx.x * blockDim.x + threadIdx.x;
-        if (j < seam[i])
-        {
-            inPixels_Sobel[i * width + j] = inPixels_Sobel[i * width + j + 1];
-            inPixels[i * width + j] = inPixels[i * width + j + 1];
-        }
-    }
+	int c = blockIdx.x * blockDim.x + threadIdx.x;
+	if (c < seam[0])
+	{
+		inPixels_Sobel_temp[c] = inPixels_Sobel[c];
+		inPixels_temp[c] = inPixels[c];
+	}
+	__syncthreads();
+	int j = 1;
+	uint8_t t_inS;
+	uchar3 t_in;
+	for (int i = 1; i < height; i++)
+	{
+		t_inS = inPixels_Sobel[seam[i - 1] + 1 + c];
+	 	t_in = inPixels[seam[i - 1] + 1 + c];
+	 	__syncthreads();
+		if (seam[i - 1] + 1 + c < seam[i])
+		{
+			inPixels_Sobel_temp[seam[i - 1] + 1 + c - j] = t_inS;
+			inPixels_temp[seam[i - 1] + 1 + c - j] = t_in;
+		}
+		__syncthreads();
+		j++;
+	}
+	int length = width * height;
+	t_inS = inPixels_Sobel[seam[height - 1] + 1 + c];
+	t_in = inPixels[seam[height - 1] + 1 + c];
+	if (seam[height - 1] + 1 + c < length)
+	{
+		inPixels_Sobel_temp[seam[height - 1] + 1 + c - j] = t_inS;
+		inPixels_temp[seam[height - 1] + 1 + c - j] = t_in;
+	}
 }
 
 
@@ -525,34 +644,54 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 		CHECK(cudaMalloc(&d_correctSeam, height * sizeof(int)));
 		CHECK(cudaMalloc(&d_trace, height * width * sizeof(int8_t)));
 
+		uchar3 * d_inPixels_temp;
+		uint8_t * d_correctOutSobelPixels_temp;
+		CHECK(cudaMalloc(&d_inPixels_temp, height * width * sizeof(uchar3)));
+		CHECK(cudaMalloc(&d_correctOutSobelPixels_temp, height * width * sizeof(uint8_t)));
+
 		CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t), cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(d_inPixels, inPixels, height * width * sizeof(uchar3), cudaMemcpyHostToDevice));
+		
+		dim3 newBlockSize(blockSize.x * blockSize.y);
+		dim3 newGridSizeX((width - 1) / newBlockSize.x + 1);
 
 		for (i; i > new_width; i--)
 		{
-			// computeEnergy(correctOutSobelPixels, i, height, correctSumEnergy);
-			computeEnergyKernel<<<gridSize, blockSize>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
-			// CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * width * sizeof(int), cudaMemcpyDeviceToHost));
-
-
-			computeSumEnergy(correctOutSobelPixels, i, height, correctSumEnergy, trace);
-			//computeSumEnergyKernel<<<gridSize, blockSize>>>(correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
-
-
-			// CHECK(cudaMemcpy(d_correctSumEnergy, correctSumEnergy, height * width * sizeof(int), cudaMemcpyHostToDevice));
-			// CHECK(cudaMemcpy(d_trace, trace, height * width * sizeof(int8_t),cudaMemcpyHostToDevice));
-			findSeam(correctSumEnergy, trace, i, height, correctSeam);
-			// findSeamKernel<<<gridSize, blockSize>>>(d_correctSumEnergy, d_trace, i, height, d_correctSeam);
-			// CHECK(cudaMemcpy(correctSeam, d_correctSeam, height * sizeof(int), cudaMemcpyDeviceToHost));
-
-
-			// CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
-			// CHECK(cudaMemcpy(d_correctOutSobelPixels, correctOutSobelPixels, height * width * sizeof(uint8_t),cudaMemcpyHostToDevice));
-			removeSeam(inPixels, correctOutSobelPixels, correctSeam, i, height);
-			// removeSeamKernel<<<gridSize, blockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, i, height);
+			size_t kernelcpBytes = i * sizeof(int);
+			computeEnergyKernel<<<newGridSizeX, newBlockSize, kernelcpBytes>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
+			size_t kernelBytes = 2 * i * sizeof(int);
+			computeSumEnergyKernel<<<newGridSizeX, newBlockSize, kernelBytes>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
+			cudaError_t errSync  = cudaGetLastError();
+			cudaError_t errAsync = cudaDeviceSynchronize();
+			if (errSync != cudaSuccess) 
+			printf("Sync kernel error: %s\n", cudaGetErrorString(errSync));
+			if (errAsync != cudaSuccess)
+			printf("Async kernel error: %s\n", cudaGetErrorString(errAsync));
 			
+			CHECK(cudaMemcpy(trace, d_trace, height * i * sizeof(int8_t), cudaMemcpyDeviceToHost));
+			CHECK(cudaMemcpy(correctSumEnergy, d_correctSumEnergy, height * i * sizeof(int), cudaMemcpyDeviceToHost));
+			findSeam(correctSumEnergy, trace, i, height, correctSeam);
+			CHECK(cudaMemcpy(d_correctSeam, correctSeam, height * sizeof(int), cudaMemcpyHostToDevice));
+			
+			removeSeamKernel<<<newGridSizeX, newBlockSize>>>(d_inPixels, d_correctOutSobelPixels, d_correctSeam, d_inPixels_temp, d_correctOutSobelPixels_temp, i, height);
+			errSync  = cudaGetLastError();
+			errAsync = cudaDeviceSynchronize();
+			if (errSync != cudaSuccess) 
+			printf("Sync kernel error: %s\n", cudaGetErrorString(errSync));
+			if (errAsync != cudaSuccess)
+			printf("Async kernel error: %s\n", cudaGetErrorString(errAsync));
+			CHECK(cudaMemcpy(d_correctOutSobelPixels, d_correctOutSobelPixels_temp, height * i * sizeof(uint8_t), cudaMemcpyDeviceToDevice));
+			CHECK(cudaMemcpy(d_inPixels, d_inPixels_temp, height * i * sizeof(uchar3), cudaMemcpyDeviceToDevice));
 			
 		}
-		// CHECK(cudaMemcpy(inPixels, d_inPixels, height * width * sizeof(uchar3), cudaMemcpyDeviceToHost));
+		CHECK(cudaMemcpy(inPixels, d_inPixels, height * i * sizeof(uchar3), cudaMemcpyDeviceToHost));
+		CHECK(cudaFree(d_inPixels));
+		CHECK(cudaFree(d_correctOutSobelPixels));
+		CHECK(cudaFree(d_correctSumEnergy));
+		CHECK(cudaFree(d_correctSeam));
+		CHECK(cudaFree(d_trace));
+		CHECK(cudaFree(d_inPixels_temp));
+		CHECK(cudaFree(d_correctOutSobelPixels_temp));
 	}
 	timer.Stop();
 	float time = timer.Elapsed();
@@ -563,6 +702,12 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 
 int main(int argc, char ** argv)
 {	
+	if (argc != 3 && argc != 4 && argc != 6)
+	{
+		printf("The number of arguments is invalid\n");
+		return EXIT_FAILURE;
+	}
+
 	// Read input image file
 	int width, height;
 	uchar3 * inPixels;
@@ -585,29 +730,34 @@ int main(int argc, char ** argv)
 	// Convert RGB to grayscale
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
 	convertRgb2Gray(inPixels, width, height, correctOutPixels);
-	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
+	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_ck4_gray_host.pnm"));
 
 	// Convert RGB to grayscale using device
 	uint8_t * outPixels= (uint8_t *)malloc(width * height);
 	dim3 blockSize(32, 32); // Default
+	if (argc == 6)
+	{
+		blockSize.x = atoi(argv[4]);
+		blockSize.y = atoi(argv[5]);
+	}  
 	convertRgb2Gray(inPixelsDevice, width, height, outPixels, true, blockSize);
-	writePnm(outPixels, width, height, concatStr(outFileNameBase, "_gray_device.pnm"));
-
-	// Compute mean absolute error between host result and device result
-	// float err = computeError(outPixels, correctOutPixels, width * height);
-	// printf("Error between device result and host result: %f\n", err);
+	writePnm(outPixels, width, height, concatStr(outFileNameBase, "_ck4_gray_device.pnm"));
 
 	// Convert grayscale to sobel-grayscale (energy)
 	uint8_t * correctOutSobelPixels= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
-	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
+	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_ck4_sobel_host.pnm"));
 
 	// Convert grayscale to sobel-grayscale (energy) using device 
 	uint8_t * correctOutSobelPixelsDevice= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(outPixels, width, height, correctOutSobelPixelsDevice, x_Sobel, y_Sobel, filterWidth, true, blockSize);
-	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_sobel_device.pnm"));
+	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_ck4_sobel_device.pnm"));
 
 	int new_width = 2 * width / 3; //Default
+	if (argc == 4 || argc == 6)
+	{
+		new_width = atoi(argv[3]);
+	}  
 	int i = width;
 	int k = width;
 
@@ -616,18 +766,28 @@ int main(int argc, char ** argv)
 	int8_t * trace = (int8_t *)malloc(width * height * sizeof(int8_t));
 	int * correctSeam = (int *)malloc(height * sizeof(int));
 	find2removeSeam(new_width, i, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
-	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_seam_host.pnm"));
+	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_ck4_seam_host.pnm"));
 
 	// Find and remove seam using device
 	int * correctSumEnergyDevice = (int *)malloc(width * height * sizeof(int));
 	int8_t * traceDevice = (int8_t *)malloc(width * height* sizeof(int8_t));
 	int * correctSeamDevice = (int *)malloc(height * sizeof(int));
 	find2removeSeam(new_width,k, correctOutSobelPixelsDevice, correctSumEnergyDevice, correctSeamDevice, traceDevice, inPixelsDevice, width, height, true, blockSize);
-	writePnm(inPixelsDevice, k, height, concatStr(outFileNameBase, "_seam_device.pnm"));
+	writePnm(inPixelsDevice, k, height, concatStr(outFileNameBase, "_ck4_seam_device.pnm"));
 
 	// Free memories
 	free(inPixels);
 	free(outPixels);
+	free(inPixels);
+	free(inPixelsDevice);
+	free(x_Sobel);
+	free(y_Sobel);
+	free(correctOutPixels);
 	free(correctOutSobelPixels);
-	free(correctOutSobelPixelsDevice);
+	free(correctSumEnergy);
+	free(trace);
+	free(correctSeam);
+	free(correctSumEnergyDevice);
+	free(traceDevice);
+	free(correctSeamDevice);
 }
