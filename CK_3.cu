@@ -684,7 +684,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 
 		for (i; i > new_width; i--)
 		{
-			size_t kernelcpBytes = i*height * sizeof(int);
+			size_t kernelcpBytes = i * sizeof(int);
 			computeEnergyKernel<<<newGridSizeX, newBlockSize, kernelcpBytes>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy);
 			size_t kernelBytes = 2 * i * sizeof(int);
 			computeSumEnergyKernel<<<newGridSizeX, newBlockSize, kernelBytes>>>(d_correctOutSobelPixels, i, height, d_correctSumEnergy, d_trace);
