@@ -63,7 +63,7 @@ void readPnm(char * fileName,
 	char type[3];
 	fscanf(f, "%s", type);
 	
-	if (strcmp(type, "P3") != 0) // In this exercise, we don't touch other types
+	if (strcmp(type, "P3") != 0)
 	{
 		fclose(f);
 		printf("Cannot read %s\n", fileName); 
@@ -75,7 +75,7 @@ void readPnm(char * fileName,
 	
 	int max_val;
 	fscanf(f, "%i", &max_val);
-	if (max_val > 255) // In this exercise, we assume 1 byte per value
+	if (max_val > 255)
 	{
 		fclose(f);
 		printf("Cannot read %s\n", fileName); 
@@ -155,8 +155,6 @@ float computeError(uint8_t * a1, uint8_t * a2, int n)
 __global__ void convertRgb2GrayKernel(uchar3 * inPixels, int width, int height, 
 		uint8_t * outPixels)
 {
-	// TODO
-    // Reminder: gray = 0.299*red + 0.587*green + 0.114*blue  
 	int r = blockIdx.y * blockDim.y + threadIdx.y;
 	int c = blockIdx.x * blockDim.x + threadIdx.x;
 
@@ -190,19 +188,14 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
             }
         }
 	}
-	else // use device
+	else 
 	{
-		// TODO: Allocate device memories
 		uchar3 * d_inPixels;
 		uint8_t * d_outPixels;
-		size_t nBytes = 3 * width * height * sizeof(uint8_t); // 3 phần tử liên tiếp lần lượt là r, g, b nên x3
+		size_t nBytes = 3 * width * height * sizeof(uint8_t);
 		CHECK(cudaMalloc(&d_inPixels, 3 * width * height * sizeof(uchar3)));
 		CHECK(cudaMalloc(&d_outPixels, nBytes));
-
-		// TODO: Copy data to device memories
 		CHECK(cudaMemcpy(d_inPixels, inPixels, nBytes, cudaMemcpyHostToDevice));
-
-		// TODO: Set grid size and call kernel (remember to check kernel error)
 		dim3 gridSize((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
 		convertRgb2GrayKernel<<<gridSize, blockSize>>>(d_inPixels, width, height, d_outPixels);
 
@@ -212,10 +205,7 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 			printf("Sync kernel error: %s\n", cudaGetErrorString(errSync));
 		if (errAsync != cudaSuccess)
 			printf("Async kernel error: %s\n", cudaGetErrorString(errAsync));
-		// TODO: Copy result from device memories
 		CHECK(cudaMemcpy(outPixels, d_outPixels, nBytes, cudaMemcpyDeviceToHost));
-
-		// TODO: Free device memories
 		CHECK(cudaFree(d_inPixels));
 		CHECK(cudaFree(d_outPixels));
 	}
@@ -324,7 +314,6 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 			useDevice == true? "use device" : "use host", time);
 }
 
-//in: inPixels				//out: outPixels, trace
 void computeEnergy(uint8_t * inPixels, int width, int height, int * outPixels)
 {
 	for (int c = 0; c < width; c++)
@@ -344,9 +333,6 @@ __global__ void computeEnergyKernel(uint8_t * inPixels, int width, int height, i
 void computeSumEnergy(uint8_t * inPixels, int width, int height,
 		int * outPixels, int8_t * trace)
 {
-	// GpuTimer timer;
-	// timer.Start();
-
 	for (int outPixelsR = height - 2; outPixelsR >= 0; outPixelsR--)
 	{
 		int outPixel_left, outPixel_mid, outPixel_right, temp, temp_sum;
@@ -373,7 +359,6 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 			}
 			else if (outPixelsC == width - 1)
 			{
-				//inPixel_cur = inPixels[outPixelsR * width + outPixelsC];
 				inPixel_cur = inPixels[(outPixelsR + 1) * width - 1];
 				outPixel_mid = outPixels[(outPixelsR + 2) * width - 1];
 				outPixel_left = outPixels[(outPixelsR + 2) * width - 2];
@@ -416,9 +401,6 @@ void computeSumEnergy(uint8_t * inPixels, int width, int height,
 			}
 		}
 	}
-	// timer.Stop();
-	// float time = timer.Elapsed();
-	// printf("Processing time (SumEnergy): %f ms\n\n", time);
 }
 
 __global__ void computeSumEnergyKernel(uint8_t * inPixels, int width, int height, int * outPixels, int8_t * trace)
@@ -638,7 +620,6 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 			
 		}
 		CHECK(cudaMemcpy(inPixels, d_inPixels, height * i * sizeof(uchar3), cudaMemcpyDeviceToHost));
-
 		CHECK(cudaFree(d_inPixels));
 		CHECK(cudaFree(d_correctOutSobelPixels));
 		CHECK(cudaFree(d_correctSumEnergy));
@@ -656,6 +637,12 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 
 int main(int argc, char ** argv)
 {	
+	if (argc != 3 && argc != 4 && argc != 6)
+	{
+		printf("The number of arguments is invalid\n");
+		return EXIT_FAILURE;
+	}
+
 	// Read input image file
 	int width, height;
 	uchar3 * inPixels;
@@ -678,29 +665,34 @@ int main(int argc, char ** argv)
 	// Convert RGB to grayscale
 	uint8_t * correctOutPixels= (uint8_t *)malloc(width * height);
 	convertRgb2Gray(inPixels, width, height, correctOutPixels);
-	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_gray_host.pnm"));
+	writePnm(correctOutPixels, width, height, concatStr(outFileNameBase, "_ck2_gray_host.pnm"));
 
 	// Convert RGB to grayscale using device
 	uint8_t * outPixels= (uint8_t *)malloc(width * height);
 	dim3 blockSize(32, 32); // Default
+	if (argc == 6)
+	{
+		blockSize.x = atoi(argv[4]);
+		blockSize.y = atoi(argv[5]);
+	}  
 	convertRgb2Gray(inPixelsDevice, width, height, outPixels, true, blockSize);
-	writePnm(outPixels, width, height, concatStr(outFileNameBase, "_gray_device.pnm"));
-
-	// Compute mean absolute error between host result and device result
-	// float err = computeError(outPixels, correctOutPixels, width * height);
-	// printf("Error between device result and host result: %f\n", err);
+	writePnm(outPixels, width, height, concatStr(outFileNameBase, "_ck2_gray_device.pnm"));
 
 	// Convert grayscale to sobel-grayscale (energy)
 	uint8_t * correctOutSobelPixels= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(correctOutPixels, width, height, correctOutSobelPixels, x_Sobel, y_Sobel, filterWidth);
-	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_sobel_host.pnm"));
+	writePnm(correctOutSobelPixels, width, height, concatStr(outFileNameBase, "_ck2_sobel_host.pnm"));
 
 	// Convert grayscale to sobel-grayscale (energy) using device 
 	uint8_t * correctOutSobelPixelsDevice= (uint8_t *)malloc(width * height);
 	convertGray2Sobel(outPixels, width, height, correctOutSobelPixelsDevice, x_Sobel, y_Sobel, filterWidth, true, blockSize);
-	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_sobel_device.pnm"));
+	writePnm(correctOutSobelPixelsDevice, width, height, concatStr(outFileNameBase, "_ck2_sobel_device.pnm"));
 
 	int new_width = 2 * width / 3; //Default
+	if (argc == 4)
+	{
+		new_width = atoi(argv[3]);
+	}  
 	int i = width;
 	int k = width;
 
@@ -709,17 +701,28 @@ int main(int argc, char ** argv)
 	int8_t * trace = (int8_t *)malloc(width * height * sizeof(int8_t));
 	int * correctSeam = (int *)malloc(height * sizeof(int));
 	find2removeSeam(new_width, i, correctOutSobelPixels, correctSumEnergy, correctSeam, trace, inPixels, width, height);
-	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_seam_host.pnm"));
+	writePnm(inPixels, i, height, concatStr(outFileNameBase, "_ck2_seam_host.pnm"));
 
 	// Find and remove seam using device
 	int * correctSumEnergyDevice = (int *)malloc(width * height * sizeof(int));
 	int8_t * traceDevice = (int8_t *)malloc(width * height* sizeof(int8_t));
 	int * correctSeamDevice = (int *)malloc(height * sizeof(int));
 	find2removeSeam(new_width,k, correctOutSobelPixelsDevice, correctSumEnergyDevice, correctSeamDevice, traceDevice, inPixelsDevice, width, height, true, blockSize);
-	writePnm(inPixelsDevice, k, height, concatStr(outFileNameBase, "_seam_device.pnm"));
+	writePnm(inPixelsDevice, k, height, concatStr(outFileNameBase, "_ck2_seam_device.pnm"));
 
 	// Free memories
 	free(inPixels);
 	free(outPixels);
-
+	free(inPixels);
+	free(inPixelsDevice);
+	free(x_Sobel);
+	free(y_Sobel);
+	free(correctOutPixels);
+	free(correctOutSobelPixels);
+	free(correctSumEnergy);
+	free(trace);
+	free(correctSeam);
+	free(correctSumEnergyDevice);
+	free(traceDevice);
+	free(correctSeamDevice);
 }
