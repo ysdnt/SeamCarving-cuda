@@ -194,12 +194,12 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 		// TODO: Allocate device memories
 		uchar3 * d_inPixels;
 		uint8_t * d_outPixels;
-		size_t nBytes = 3 * width * height * sizeof(uint8_t); // 3 phần tử liên tiếp lần lượt là r, g, b nên x3
-		CHECK(cudaMalloc(&d_inPixels, 3 * width * height * sizeof(uchar3)));
+		size_t nBytes = width * height * sizeof(uint8_t);
+		CHECK(cudaMalloc(&d_inPixels, width * height * sizeof(uchar3)));
 		CHECK(cudaMalloc(&d_outPixels, nBytes));
 
 		// TODO: Copy data to device memories
-		CHECK(cudaMemcpy(d_inPixels, inPixels, nBytes, cudaMemcpyHostToDevice));
+		CHECK(cudaMemcpy(d_inPixels, inPixels, width * height * sizeof(uchar3), cudaMemcpyHostToDevice));
 
 		// TODO: Set grid size and call kernel (remember to check kernel error)
 		dim3 gridSize((width - 1) / blockSize.x + 1, (height - 1) / blockSize.y + 1);
