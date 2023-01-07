@@ -154,7 +154,7 @@ void convertRgb2Gray(uchar3 * inPixels, int width, int height,
 	timer.Stop();
 	float time = timer.Elapsed();
 	printf("Processing time (convertRgb2Gray) (%s): %f ms\n\n", 
-		 "use device" , time);
+		 "use host" , time);
 }
 
 void convertGray2Sobel(uint8_t * inPixels, int width, int height,
@@ -190,7 +190,7 @@ void convertGray2Sobel(uint8_t * inPixels, int width, int height,
 	timer.Stop();
 	float time = timer.Elapsed();
 	printf("Processing time (convertGray2Sobel) (%s): %f ms\n\n", 
-		 "use device" , time);
+		 "use host" , time);
 }
 
 void computeEnergy(uint8_t * inPixels, int width, int height,
@@ -334,7 +334,7 @@ void find2removeSeam(int new_width, int &i, uint8_t * correctOutSobelPixels, int
 	timer.Stop();
 	float time = timer.Elapsed();
 	printf("Processing time (find2removeSeam) (%s): %f ms\n\n", 
-		 "use device" , time);
+		 "use host" , time);
 }
 int main(int argc, char ** argv)
 {	
