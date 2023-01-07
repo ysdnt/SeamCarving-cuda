@@ -169,7 +169,7 @@ __global__ void convertRgb2GrayKernel(uchar3 * inPixels, int width, int height,
             uint8_t red = s_in[threadIdx.y * blockDim.x + threadIdx.x].x;
             uint8_t green = s_in[threadIdx.y * blockDim.x + threadIdx.x].y;
             uint8_t blue = s_in[threadIdx.y * blockDim.x + threadIdx.x].z;
-            outPixels[i] = (red + 2 * green + blue) >> 2;
+            outPixels[i] = 0.299f * red + 0.587f * green + 0.114f * blue;
         }
 	}
 
