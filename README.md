@@ -1,1 +1,1 @@
-Parallel programing project by implement seam carving algorithm in CUDA C
+Parallel programing grouping project by implement seam carving algorithm by CUDA C.
